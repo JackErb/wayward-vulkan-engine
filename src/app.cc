@@ -182,6 +182,7 @@ void application::create_instance() {
 
     // Get supported extensions
     uint32_t extensionCount = 0;
+
     vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
 
     std::vector<VkExtensionProperties> extensions(extensionCount);
