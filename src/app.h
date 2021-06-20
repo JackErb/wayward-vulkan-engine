@@ -30,6 +30,9 @@ public:
     void run();
 
 private:
+    void draw_frame();
+
+    /* Initialization */
     void init_glfw();
     void init_vulkan();
 
@@ -45,6 +48,9 @@ private:
     void create_render_pass();
     void create_graphics_pipeline();
     void create_framebuffers();
+    void create_command_pool();
+    void create_command_buffers();
+    void create_semaphores();
 
     VkSurfaceFormatKHR choose_swap_surface_format();
     VkPresentModeKHR choose_swap_present_mode();
@@ -86,6 +92,13 @@ private:
     VkRenderPass render_pass;
     VkPipelineLayout pipeline_layout;
     VkPipeline graphics_pipeline;
+
+    // Commander buffers
+    VkCommandPool command_pool;
+    std::vector<VkCommandBuffer> command_buffers;
+
+    VkSemaphore image_available_semaphore;
+    VkSemaphore render_finished_semaphore;
 
     // Cached data from querying device properties
     QueueIndices indices;

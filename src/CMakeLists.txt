@@ -16,7 +16,7 @@ set(ENV{VK_LAYER_PATH} $ENV{VULKAN_SDK}/share/explicit_layer.d)
 message(STATUS $ENV{VK_ICD_FILENAMES})
 message(STATUS $ENV{VK_LAYER_PATH})
 
-set(SOURCE_FILES main.cc app.h app.cc shaders.cc resources.cc)
+set(SOURCE_FILES main.cc app.h app_init.cc app.cc shaders.cc resources.cc)
 file(GLOB_RECURSE RES_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/resources/*")
 
 if (APPLE)
