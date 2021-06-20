@@ -16,21 +16,22 @@ set(ENV{VK_LAYER_PATH} $ENV{VULKAN_SDK}/share/explicit_layer.d)
 message(STATUS $ENV{VK_ICD_FILENAMES})
 message(STATUS $ENV{VK_LAYER_PATH})
 
-set(SOURCE_FILES main.cc app.h app.cc)
+set(SOURCE_FILES main.cc app.h app.cc shaders.cc resources.cc)
+file(GLOB_RECURSE RES_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/resources/*")
 
 if (APPLE)
-    add_executable(DinoHerder MACOSX_BUNDLE ${SOURCE_FILES})
-	set(SDL_LIBS "/Library/Frameworks/SDL2.framework"
-                 "/Library/Frameworks/SDL2_image.framework"
-    )
-
-    set(VULKAN_LIBS
-                    #"/Users/jackerb/VulkanSDK/1.2.176.1/MoltenVK/dylib/macOS/libMoltenVK.dylib"
-                    $ENV{VULKAN_SDK}/Frameworks/vulkan.framework
-                    "/usr/local/lib/libglfw.3.3.dylib")
-
-    target_include_directories(DinoHerder PRIVATE /usr/local/include)
+    # Create executable
+    add_executable(DinoHerder MACOSX_BUNDLE ${SOURCE_FILES} ${RES_SOURCES})
+    set_source_files_properties(${RES_SOURCES} PROPERTIES MACOSX_PACKAGE_LOCATION resources/)
+	
+    set(SDL_LIBS "/Library/Frameworks/SDL2.framework"
+                 "/Library/Frameworks/SDL2_image.framework")
+    set(GLFW_LIBS "/usr/local/lib/libglfw.3.3.dylib")
+    set(VULKAN_LIBS "/usr/local/lib/libvulkan.1.2.176.dylib" "/usr/local/lib/libvulkan.1.dylib")
 endif()
+
+# Header includes
+target_include_directories(DinoHerder PRIVATE /usr/local/include)
 
 # Optimization
 set(OPTIMIZATION_FLAG "-O0")
@@ -43,7 +44,7 @@ set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} ${OPTIMIZATION_FLAG}")
 target_include_directories(DinoHerder PRIVATE ../inc)
 
 set(GAME_LIBRARIES "")
-target_link_libraries(DinoHerder PRIVATE ${SDL_LIBS}
+target_link_libraries(DinoHerder PRIVATE ${GAME_LIBRARIES}
+                                         ${GLFW_LIBS}
                                          ${VULKAN_LIBS}
-                                         ${GAME_LIBRARIES}
                                          )
