@@ -226,6 +226,12 @@ application::application() {
 }
 
 application::~application() {
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        vkDestroySemaphore(device, image_available_semaphores[i], nullptr);
+        vkDestroySemaphore(device, render_finished_semaphores[i], nullptr);
+        vkDestroyFence(device, in_flight_fences[i], nullptr);
+    }
+
     vkDestroyCommandPool(device, command_pool, nullptr);
     for (VkFramebuffer framebuffer : swap_chain_framebuffers) {
         vkDestroyFramebuffer(device, framebuffer, nullptr);
@@ -280,7 +286,7 @@ void application::init_glfw() {
     create_command_pool();
     create_command_buffers();
     
-    create_semaphores();
+    create_synchronization_objects();
 }
 
 void application::create_instance() {
@@ -607,12 +613,22 @@ void application::create_render_pass() {
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &colorAttachmentRef;
 
+    VkSubpassDependency dependency{};
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = 0;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
     VkRenderPassCreateInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     renderPassInfo.attachmentCount = 1;
     renderPassInfo.pAttachments = &colorAttachment;
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
+    renderPassInfo.dependencyCount = 1;
+    renderPassInfo.pDependencies = &dependency;
 
     VkResult result = vkCreateRenderPass(device, &renderPassInfo, nullptr, &render_pass);
     if (result != VK_SUCCESS) {
@@ -775,7 +791,7 @@ void application::create_command_buffers() {
     createBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     createBufferInfo.commandPool = command_pool;
     createBufferInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    createBufferInfo.commandBufferCount = command_buffers.size();
+    createBufferInfo.commandBufferCount = static_cast<uint32_t>(command_buffers.size());
 
     VkResult result = vkAllocateCommandBuffers(device, &createBufferInfo, command_buffers.data());
     if (result != VK_SUCCESS) {
@@ -798,11 +814,10 @@ void application::create_command_buffers() {
         renderBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         renderBeginInfo.renderPass = render_pass;
         renderBeginInfo.framebuffer = swap_chain_framebuffers[i];
-        renderBeginInfo.renderArea.offset = { 0, 0 };
+        renderBeginInfo.renderArea.offset = {0, 0};
         renderBeginInfo.renderArea.extent = swap_chain_extent;
         VkClearValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
         renderBeginInfo.clearValueCount = 1;
-
         renderBeginInfo.pClearValues = &clearColor;
 
         /* Render pass */
@@ -821,12 +836,24 @@ void application::create_command_buffers() {
 
 }
 
-void application::create_semaphores() {
-    VkSemaphoreCreateInfo createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+void application::create_synchronization_objects() {
+    image_available_semaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    render_finished_semaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    in_flight_fences.resize(MAX_FRAMES_IN_FLIGHT);
+    images_in_flight.resize(swap_chain_images.size(), VK_NULL_HANDLE);
 
-    if (vkCreateSemaphore(device, &createInfo, nullptr, &image_available_semaphore) != VK_SUCCESS ||
-        vkCreateSemaphore(device, &createInfo, nullptr, &render_finished_semaphore) != VK_SUCCESS) {
-        logger::fatal_error("failed to create semaphores");
+    VkSemaphoreCreateInfo semaphoreInfo{};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    VkFenceCreateInfo fenceInfo{};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &image_available_semaphores[i]) != VK_SUCCESS ||
+            vkCreateSemaphore(device, &semaphoreInfo, nullptr, &render_finished_semaphores[i]) != VK_SUCCESS ||
+            vkCreateFence(device, &fenceInfo, nullptr, &in_flight_fences[i]) != VK_SUCCESS) {
+            logger::fatal_error("failed to create synchronization objects");
+        }
     }
 }

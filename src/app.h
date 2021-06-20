@@ -50,7 +50,7 @@ private:
     void create_framebuffers();
     void create_command_pool();
     void create_command_buffers();
-    void create_semaphores();
+    void create_synchronization_objects();
 
     VkSurfaceFormatKHR choose_swap_surface_format();
     VkPresentModeKHR choose_swap_present_mode();
@@ -97,8 +97,13 @@ private:
     VkCommandPool command_pool;
     std::vector<VkCommandBuffer> command_buffers;
 
-    VkSemaphore image_available_semaphore;
-    VkSemaphore render_finished_semaphore;
+    // Synchronization
+    const int MAX_FRAMES_IN_FLIGHT = 2;
+    size_t current_frame = 0;
+    std::vector<VkSemaphore> image_available_semaphores;
+    std::vector<VkSemaphore> render_finished_semaphores;
+    std::vector<VkFence> in_flight_fences;
+    std::vector<VkFence> images_in_flight;
 
     // Cached data from querying device properties
     QueueIndices indices;
