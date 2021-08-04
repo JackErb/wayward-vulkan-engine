@@ -1,113 +1,52 @@
-#ifndef APPLICATION_H
-#define APPLICATION_H
+#pragma once
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+#include "wvk_window.h"
+#include "wvk_device.h"
+#include "wvk_pipeline.h"
+#include "wvk_model.h"
+#include "wvk_skeleton.h"
 
-#include <optional>
 #include <vector>
 
-struct QueueIndices {
-    std::optional<uint32_t> graphics;
-    std::optional<uint32_t> present;
+namespace wvk {
 
-    bool has_queues() {
-        return graphics.has_value() && present.has_value();
-    }
+struct CameraTransform {
+    glm::vec3 position;
+
+    glm::vec3 lookingAt;
+
 };
 
-struct SwapChainSupportDetails {
-    VkSurfaceCapabilitiesKHR capabilities;
-    std::vector<VkSurfaceFormatKHR> formats;
-    std::vector<VkPresentModeKHR> present_modes;
-};
+class WvkApplication {
+  public:
+    static constexpr int WIDTH = 800;
+    static constexpr int HEIGHT = 600;
 
-class application {
-public:
-    application();
-    ~application();
+    WvkApplication();
+    ~WvkApplication();
+
+    WvkApplication(const WvkApplication &) = delete;
+    WvkApplication &operator=(const WvkApplication &) = delete;
 
     void run();
+  
+  private:
+    void createCommandBuffers();
+    void freeCommandBuffers();
+    void recordCommandBuffer(int imageIndex);
 
-private:
-    void draw_frame();
+    void loadModels();
+    void imguiInit();
 
-    /* Initialization */
-    void init_glfw();
-    void init_vulkan();
+    WvkWindow window{WIDTH, HEIGHT, "Hello Vulkan!"};
+    WvkDevice device{window};
+    WvkSwapchain swapChain{device, window.getExtent()};
+    WvkPipeline pipeline{device, swapChain, swapChain.getRenderPass(), "triangle.vert.spv", "triangle.frag.spv", WvkPipeline::defaultPipelineConfigInfo(swapChain.getExtent())};
 
-    // Initialize vulkan and choose GPU
-    void create_instance();
-    void create_surface();
-    void pick_physical_device();
-    void create_logical_device();
+    std::vector<WvkModel*> models;
+    std::vector<WvkSkeleton*> skeletons;
 
-    // Set up rendering infrastructure
-    void create_swap_chain();
-    void create_image_views();
-    void create_render_pass();
-    void create_graphics_pipeline();
-    void create_framebuffers();
-    void create_command_pool();
-    void create_command_buffers();
-    void create_synchronization_objects();
-
-    VkSurfaceFormatKHR choose_swap_surface_format();
-    VkPresentModeKHR choose_swap_present_mode();
-    VkExtent2D choose_swap_extent();
-
-    bool is_device_suitable(VkPhysicalDevice device);
-    QueueIndices find_queue_families(VkPhysicalDevice device);
-    void query_swap_chain_support(VkPhysicalDevice device);
-    VkShaderModule create_shader_module(const std::string& filename);
-
-    GLFWwindow* window = nullptr;
-
-    // The Vulkan instance
-    VkInstance instance = VK_NULL_HANDLE;
-
-    // The physical device (GPU) to be utilized
-    VkPhysicalDevice physical_device = VK_NULL_HANDLE;
-
-    // The logical device, a specific instance of the physical device
-    VkDevice device = VK_NULL_HANDLE;
-
-    // Queue handles
-    VkQueue graphics_queue;
-    VkQueue present_queue;
-
-    // The window surface
-    VkSurfaceKHR surface = VK_NULL_HANDLE;
-
-    // The swap chain
-    VkSwapchainKHR swap_chain;
-    std::vector<VkImage> swap_chain_images;
-    std::vector<VkImageView> swap_chain_image_views;
-    std::vector<VkFramebuffer> swap_chain_framebuffers;
-
-    VkFormat swap_chain_format;
-    VkExtent2D swap_chain_extent;
-    
-    // The graphics pipeline
-    VkRenderPass render_pass;
-    VkPipelineLayout pipeline_layout;
-    VkPipeline graphics_pipeline;
-
-    // Commander buffers
-    VkCommandPool command_pool;
-    std::vector<VkCommandBuffer> command_buffers;
-
-    // Synchronization
-    const int MAX_FRAMES_IN_FLIGHT = 2;
-    size_t current_frame = 0;
-    std::vector<VkSemaphore> image_available_semaphores;
-    std::vector<VkSemaphore> render_finished_semaphores;
-    std::vector<VkFence> in_flight_fences;
-    std::vector<VkFence> images_in_flight;
-
-    // Cached data from querying device properties
-    QueueIndices indices;
-    SwapChainSupportDetails swap_chain_details;
+    std::vector<VkCommandBuffer> commandBuffers;
 };
 
-#endif
+};

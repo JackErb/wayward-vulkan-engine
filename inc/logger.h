@@ -21,6 +21,7 @@ namespace logger {
     }
 
     template <class T>
+    [[ noreturn ]]
     void fatal_error(T msg) {
         error(msg);
         throw std::runtime_error(msg);

@@ -16,3 +16,4 @@ for file in files:
         filepath = path + "/" + file
         spirv_filepath = filepath + ".spv"
         os.system(glslc + " " + filepath + " -o " + spirv_filepath)
+        print("Compiled shader: " + file)
