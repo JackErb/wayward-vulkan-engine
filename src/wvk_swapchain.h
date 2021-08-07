@@ -17,7 +17,7 @@ struct SwapchainSupportDetails {
 
 class WvkSwapchain {
   public:
-    static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+    static constexpr int MAX_FRAMES_IN_FLIGHT = 3;
 
     WvkSwapchain(WvkDevice &device, VkExtent2D extent);
     ~WvkSwapchain();
@@ -26,9 +26,11 @@ class WvkSwapchain {
     void operator=(const WvkSwapchain &) = delete;
 
     VkRenderPass getRenderPass() { return renderPass; }
+    VkRenderPass getShadowRenderPass() { return shadowRenderPass; }
+    VkFramebuffer getFramebuffer(size_t imageIndex) { return framebuffers[imageIndex]; }
+    VkFramebuffer getShadowFramebuffer() { return shadowFramebuffer; }
     VkExtent2D getExtent() { return swapChainExtent; }
     uint32_t getImageCount() { return images.size(); }
-    VkFramebuffer getFramebuffer(size_t imageIndex) { return framebuffers[imageIndex]; }
 
     uint32_t acquireNextImage();
     void submitCommands(VkCommandBuffer buffer, uint32_t imageIndex);

@@ -14,8 +14,10 @@ WvkPipeline::WvkPipeline(WvkDevice& device,
                          VkRenderPass renderPass,
                          std::string vertShader,
                          std::string fragShader,
+                         const DescriptorSetInfo &descriptorInfo,
                          const PipelineConfigInfo& config)
-                         : device{device}, swapChain{swapchain}, renderPass{renderPass} {
+                         : device{device}, swapChain{swapchain}, renderPass{renderPass},
+                           descriptorSetInfo{descriptorInfo} {
     createPipelineLayout();
     logger::debug("Created graphics pipeline layout");
 
@@ -25,8 +27,9 @@ WvkPipeline::WvkPipeline(WvkDevice& device,
     createDescriptorPool();
     logger::debug("Created descriptor pool");
 
-    createDescriptorResources();
-    logger::debug("Created descriptor resources");
+    // TODO
+    // createDescriptorResources();
+    // logger::debug("Created descriptor resources");
 
     createDescriptorSets();
     logger::debug("Created descriptor sets");
@@ -36,43 +39,16 @@ WvkPipeline::~WvkPipeline() {
     VkDevice dev = device.getDevice();
 
     vkDestroyShaderModule(dev, vertShaderModule, nullptr);
-    vkDestroyShaderModule(dev, fragShaderModule, nullptr);
+    if (fragShaderModule != VK_NULL_HANDLE) vkDestroyShaderModule(dev, fragShaderModule, nullptr);
 
     vkDestroyDescriptorSetLayout(dev, descriptorSetLayout, nullptr);
     vkDestroyPipelineLayout(dev, pipelineLayout, nullptr);
     vkDestroyPipeline(dev, graphicsPipeline, nullptr);
 
     vkDestroyDescriptorPool(dev, descriptorPool, nullptr);
-
-    vkDestroySampler(dev, textureSampler, nullptr);
-    for (WvkBuffer buffer : uniformBuffers) {
-        buffer.cleanup(dev);
-    }
-}
-
-static int frame = 0;
-
-void WvkPipeline::updateUniformBuffer(int imageIndex) {
-    float rotation = (float) frame / 1000.f;
-    frame++;
-
-    VkExtent2D extent = swapChain.getExtent();
-
-    UniformBufferObject ubo{};
-    ubo.model = glm::rotate(glm::mat4(1.0f), rotation * glm::radians(90.f), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.projection = glm::perspective(glm::radians(45.0f), (float) extent.width / (float) extent.height, 0.1f, 10.0f);
-    ubo.projection[1][1] *= -1;
-
-    void *pData;
-    vkMapMemory(device.getDevice(), uniformBuffers[imageIndex].memory, 0, sizeof(ubo), 0, &pData);
-    memcpy(pData, &ubo, sizeof(ubo));
-    vkUnmapMemory(device.getDevice(), uniformBuffers[imageIndex].memory);
 }
 
 void WvkPipeline::bind(VkCommandBuffer commandBuffer, int imageIndex) {
-    updateUniformBuffer(imageIndex);
-
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[imageIndex], 0, nullptr);
@@ -110,23 +86,14 @@ VkShaderModule WvkPipeline::createShaderModule(const std::string& filename) {
     return shaderModule;
 }
 
-PipelineConfigInfo WvkPipeline::defaultPipelineConfigInfo(VkExtent2D extent) {
+PipelineConfigInfo WvkPipeline::defaultPipelineConfigInfo() {
     PipelineConfigInfo configInfo{};
     configInfo.inputAssemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     configInfo.inputAssemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     configInfo.inputAssemblyInfo.primitiveRestartEnable = VK_FALSE;
 
     VkViewport viewport{};
-    viewport.x = 0.f;
-    viewport.y = 0.f;
-    viewport.width = extent.width;
-    viewport.height = extent.height;
-    viewport.minDepth = 0.f;
-    viewport.maxDepth = 1.f;
-
     VkRect2D scissor{};
-    scissor.offset = {0,0};
-    scissor.extent = extent;
 
     configInfo.viewportInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     configInfo.viewportInfo.viewportCount = 1;
@@ -198,22 +165,26 @@ PipelineConfigInfo WvkPipeline::defaultPipelineConfigInfo(VkExtent2D extent) {
 
 void WvkPipeline::createGraphicsPipeline(std::string vertShader, std::string fragShader, const PipelineConfigInfo& config) {
     vertShaderModule = createShaderModule(vertShader);
-    fragShaderModule = createShaderModule(fragShader);
 
-    /* Create the shader stages */
     VkPipelineShaderStageCreateInfo vertStageInfo{};
     vertStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     vertStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
     vertStageInfo.module = vertShaderModule;
     vertStageInfo.pName = "main";
 
-    VkPipelineShaderStageCreateInfo fragStageInfo{};
-    fragStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    fragStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    fragStageInfo.module = fragShaderModule;
-    fragStageInfo.pName = "main";
+    std::vector<VkPipelineShaderStageCreateInfo> shaderStages = {vertStageInfo};
 
-    std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages = {vertStageInfo, fragStageInfo};
+    if (fragShader.size() > 0) {
+        fragShaderModule = createShaderModule(fragShader);
+
+        VkPipelineShaderStageCreateInfo fragStageInfo{};
+        fragStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        fragStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        fragStageInfo.module = fragShaderModule;
+        fragStageInfo.pName = "main";
+
+        shaderStages.push_back(fragStageInfo);
+    }
 
     // Vertex input info
     auto bindingDescription = Vertex::getBindingDescription();
@@ -231,19 +202,19 @@ void WvkPipeline::createGraphicsPipeline(std::string vertShader, std::string fra
     /* Create the graphics pipeline */
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
-    pipelineInfo.pStages = shaderStages.data();
-    pipelineInfo.pVertexInputState = &inputInfo;
+    pipelineInfo.stageCount          = static_cast<uint32_t>(shaderStages.size());
+    pipelineInfo.pStages             = shaderStages.data();
+    pipelineInfo.pVertexInputState   = &inputInfo;
     pipelineInfo.pInputAssemblyState = &pipelineConfig.inputAssemblyInfo;
-    pipelineInfo.pTessellationState = nullptr;
-    pipelineInfo.pViewportState = &pipelineConfig.viewportInfo;
+    pipelineInfo.pTessellationState  = nullptr;
+    pipelineInfo.pViewportState      = &pipelineConfig.viewportInfo;
     pipelineInfo.pRasterizationState = &pipelineConfig.rasterizationInfo;
-    pipelineInfo.pMultisampleState = &pipelineConfig.multisampleInfo;
-    pipelineInfo.pDepthStencilState = &pipelineConfig.depthStencilInfo;
-    pipelineInfo.pColorBlendState = &pipelineConfig.colorBlendInfo;
-    pipelineInfo.pDynamicState = &pipelineConfig.dynamicStateInfo;
-    pipelineInfo.layout = pipelineLayout;
-    pipelineInfo.renderPass = renderPass;
+    pipelineInfo.pMultisampleState   = &pipelineConfig.multisampleInfo;
+    pipelineInfo.pDepthStencilState  = &pipelineConfig.depthStencilInfo;
+    pipelineInfo.pColorBlendState    = &pipelineConfig.colorBlendInfo;
+    pipelineInfo.pDynamicState       = &pipelineConfig.dynamicStateInfo;
+    pipelineInfo.layout              = pipelineLayout;
+    pipelineInfo.renderPass          = renderPass;
 
     VkResult result = vkCreateGraphicsPipelines(device.getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline);
     checkVulkanError(result, "failed to create pipeline.");
@@ -251,28 +222,17 @@ void WvkPipeline::createGraphicsPipeline(std::string vertShader, std::string fra
 
 void WvkPipeline::createPipelineLayout() {
     // Set descriptor set bindings
-    VkDescriptorSetLayoutBinding textureArrayBinding{};
-    textureArrayBinding.binding = 0;
-    textureArrayBinding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-    textureArrayBinding.descriptorCount = images.size();
-    textureArrayBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    textureArrayBinding.pImmutableSamplers = nullptr;
+    size_t len = descriptorSetInfo.layoutBindings.size();
+    std::vector<VkDescriptorSetLayoutBinding> bindings{len};
+    for (size_t i = 0; i < len; i++) {
+        DescriptorLayoutInfo binding = descriptorSetInfo.layoutBindings[i];
 
-    VkDescriptorSetLayoutBinding samplerBinding{};
-    samplerBinding.binding = 1;
-    samplerBinding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-    samplerBinding.descriptorCount = 1;
-    samplerBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    samplerBinding.pImmutableSamplers = nullptr;
-
-    VkDescriptorSetLayoutBinding uboBinding{};
-    uboBinding.binding = 2;
-    uboBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uboBinding.descriptorCount = 1;
-    uboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    uboBinding.pImmutableSamplers = nullptr;
-
-    std::array<VkDescriptorSetLayoutBinding, 3> bindings = {textureArrayBinding, samplerBinding, uboBinding};
+        bindings[i].binding = i;
+        bindings[i].descriptorType = binding.type;
+        bindings[i].descriptorCount = binding.count;
+        bindings[i].stageFlags = binding.stageFlags;
+        bindings[i].pImmutableSamplers = nullptr; // TODO: look into usage of this field
+    }
 
     // Create descriptor set layout containing all bindings
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
@@ -296,13 +256,13 @@ void WvkPipeline::createPipelineLayout() {
 void WvkPipeline::createDescriptorPool() {
     uint32_t imageCount = swapChain.getImageCount();
 
-    std::array<VkDescriptorPoolSize, 3> poolSizes{};
-    poolSizes[0].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-    poolSizes[0].descriptorCount = imageCount * images.size();
-    poolSizes[1].type = VK_DESCRIPTOR_TYPE_SAMPLER;
-    poolSizes[1].descriptorCount = imageCount;
-    poolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[2].descriptorCount = imageCount;
+    size_t len = descriptorSetInfo.layoutBindings.size();
+    std::vector<VkDescriptorPoolSize> poolSizes{len};
+    for (size_t i = 0; i < len; i++) {
+        DescriptorLayoutInfo layout = descriptorSetInfo.layoutBindings[i];
+        poolSizes[i].type = layout.type;
+        poolSizes[i].descriptorCount = imageCount * layout.count;
+    }
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -314,7 +274,7 @@ void WvkPipeline::createDescriptorPool() {
     checkVulkanError(result, "failed to create descriptor pool");
 }
 
-void WvkPipeline::createDescriptorResources() {
+/*void WvkPipeline::createDescriptorResources() {
     // Create the image
     textureImages.resize(images.size());
     for (size_t i = 0; i < images.size(); i++) {
@@ -356,7 +316,7 @@ void WvkPipeline::createDescriptorResources() {
                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                             uniformBuffers[i]);
     }
-}
+}*/
 
 void WvkPipeline::createDescriptorSets() {
     uint32_t imageCount = swapChain.getImageCount();
@@ -374,8 +334,87 @@ void WvkPipeline::createDescriptorSets() {
     VkResult result = vkAllocateDescriptorSets(dev, &allocInfo, descriptorSets.data());
     checkVulkanError(result, "failed to allocate descriptor sets");
 
-    for (size_t i = 0; i < imageCount; i++) {
-        VkDescriptorBufferInfo bufferInfo{};
+
+    for (size_t imageIndex = 0; imageIndex < imageCount; imageIndex++) {
+        std::vector<VkWriteDescriptorSet> descriptorWrite{descriptorSetInfo.layoutBindings.size()};
+
+        VkDescriptorBufferInfo       bufferInfos[MAX_DESCRIPTORS][MAX_DESCRIPTOR_COUNT];
+        VkDescriptorImageInfo  sampledImageInfos[MAX_DESCRIPTORS][MAX_DESCRIPTOR_COUNT];
+        VkDescriptorImageInfo       samplerInfos[MAX_DESCRIPTORS][MAX_DESCRIPTOR_COUNT];
+
+        size_t   bufferInfoIndex = 0;
+        size_t sampledImageIndex = 0;
+        size_t      samplerIndex = 0;
+
+        for (size_t layoutIndex = 0; layoutIndex < descriptorWrite.size(); layoutIndex++) {
+            DescriptorLayoutInfo *layout = &descriptorSetInfo.layoutBindings[layoutIndex];
+            VkWriteDescriptorSet *descriptor = &descriptorWrite[layoutIndex];
+
+            descriptor->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptor->dstSet = descriptorSets[imageIndex];
+            descriptor->dstBinding = layoutIndex;
+            descriptor->dstArrayElement = 0;
+            descriptor->descriptorType = layout->type;
+            descriptor->descriptorCount = layout->count;
+
+            size_t descriptorSetImageIndex;
+            if (layout->unique) {
+                descriptorSetImageIndex = imageIndex;
+            } else {
+                descriptorSetImageIndex = 0;
+            }
+
+            switch (layout->type) {
+            case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+                logger::debug("Uniform buffer " + std::to_string(descriptorSetImageIndex));
+                logger::debug(layout->data[descriptorSetImageIndex][0].buffer);
+                {
+                    size_t index = bufferInfoIndex++;
+                    for (size_t j = 0; j < layout->count; j++)
+                    {
+                        bufferInfos[index][j].buffer = layout->data[descriptorSetImageIndex][j].buffer;
+                        bufferInfos[index][j].offset = 0;
+                        bufferInfos[index][j].range = sizeof(UniformBufferObject);
+                    }
+
+                    descriptor->pBufferInfo = bufferInfos[index];
+                }
+                break;
+            case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+                logger::debug("Sampled image");
+                {
+                    size_t index = sampledImageIndex++;
+                    for (size_t j = 0; j < layout->count; j++)
+                    {
+                        sampledImageInfos[index][j].sampler = nullptr;
+                        sampledImageInfos[index][j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                        sampledImageInfos[index][j].imageView = layout->data[descriptorSetImageIndex][j].imageView;
+                    }
+
+                    descriptor->pImageInfo = sampledImageInfos[index];
+                }
+                break;
+            case VK_DESCRIPTOR_TYPE_SAMPLER:
+                logger::debug("Sampler");
+                {
+                    size_t index = samplerIndex++;
+                    for (size_t j = 0; j < layout->count; j++)
+                    {
+                        samplerInfos[index][j].sampler = layout->data[descriptorSetImageIndex][j].sampler;
+                    }
+
+                    descriptor->pImageInfo = samplerInfos[index];
+                }
+                break;
+            default:
+                logger::fatal_error("Unknown VkDescriptorType when creating descriptor set. " + std::to_string(layout->type));
+                break;
+            }
+        }
+
+        vkUpdateDescriptorSets(dev, static_cast<uint32_t>(descriptorWrite.size()), descriptorWrite.data(), 0, nullptr);
+
+        /*VkDescriptorBufferInfo bufferInfo{};
         bufferInfo.buffer = uniformBuffers[i].buffer;
         bufferInfo.offset = 0;
         bufferInfo.range = sizeof(UniformBufferObject);
@@ -419,7 +458,7 @@ void WvkPipeline::createDescriptorSets() {
         descriptorWrite[2].descriptorCount = 1;
         descriptorWrite[2].pBufferInfo = &bufferInfo;
 
-        vkUpdateDescriptorSets(dev, static_cast<uint32_t>(descriptorWrite.size()), descriptorWrite.data(), 0, nullptr);
+        vkUpdateDescriptorSets(dev, static_cast<uint32_t>(descriptorWrite.size()), descriptorWrite.data(), 0, nullptr);*/
     }
 }
 

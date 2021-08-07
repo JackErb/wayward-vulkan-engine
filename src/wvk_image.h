@@ -10,19 +10,13 @@
 
 namespace wvk {
 
-class WvkImage {
+class Image {
 public:
-    WvkImage(WvkDevice& device, std::string filename);
-    ~WvkImage();
+    Image() {}
+    Image(WvkDevice& device, std::string filename);
+    void cleanup();
 
-    uint32_t getWidth() { return width; }
-    uint32_t getHeight() { return height; }
-
-    VkImage getImage() { return image; }
-    VkImageView getImageView() { return imageView; }
-
-private:
-    WvkDevice& device;
+    VkDevice device = VK_NULL_HANDLE;
 
     uint32_t width;
     uint32_t height;

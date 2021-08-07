@@ -14,6 +14,12 @@
 namespace wvk {
 
 WvkApplication::WvkApplication() {
+    createPipelineResources();
+    logger::debug("Created pipeline resources");
+
+    createPipelines();
+    logger::debug("Created application pipelines");
+
     createCommandBuffers();
     logger::debug("Created command buffers");
 
@@ -27,6 +33,16 @@ WvkApplication::~WvkApplication() {
     vkQueueWaitIdle(device.getGraphicsQueue());
     vkQueueWaitIdle(device.getPresentQueue());
     freeCommandBuffers();
+
+    for (auto &image : textureImages) {
+        image.cleanup();
+    }
+
+    for (auto &buffer : cameraTransformBuffers) {
+        buffer.cleanup();
+    }
+
+    textureSampler.cleanup();
 
     for (WvkModel *model : models) {
         delete model;
@@ -79,7 +95,6 @@ void WvkApplication::run() {
     using namespace std::chrono;
 
     const int FRAME_INTERVAL = 240;
-    long frame = 0;
     long timeCount = 0;
 
     while (!glfwWindowShouldClose(window.getGlfwWindow())) {
@@ -107,6 +122,66 @@ void WvkApplication::run() {
     }
 }
 
+void WvkApplication::createPipelineResources() {
+    // Allocate texture images
+    for (size_t i = 0; i < images.size(); i++) {
+        textureImages.push_back(Image{device, images[i]});
+    }
+
+    logger::debug("uniform buffers");
+    // Allocate uniform buffers (one per swapchain image)
+    VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+    for (size_t i = 0; i < swapChain.getImageCount(); i++) {
+        cameraTransformBuffers.emplace_back();
+        device.createBuffer(bufferSize,
+                            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                            cameraTransformBuffers[i]);
+    }
+}
+
+void WvkApplication::createPipelines() {
+    PipelineConfigInfo defaultConfig = WvkPipeline::defaultPipelineConfigInfo();
+
+    DescriptorSetInfo mainDescriptor{};
+    auto &mainLayout = mainDescriptor.layoutBindings;
+
+    mainLayout.resize(3);
+
+    mainLayout[0].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    mainLayout[0].count = textureImages.size();
+    mainLayout[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    mainLayout[0].unique = false;
+    for (size_t i = 0; i < textureImages.size(); i++) {
+        mainLayout[0].data[0][i].imageView = textureImages[i].imageView;
+    }
+
+    mainLayout[1].type = VK_DESCRIPTOR_TYPE_SAMPLER;
+    mainLayout[1].count = 1;
+    mainLayout[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    mainLayout[1].unique = false;
+    mainLayout[1].data[0][0].sampler = textureSampler.sampler;
+
+    mainLayout[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    mainLayout[2].count = 1;
+    mainLayout[2].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    mainLayout[2].unique = true;
+    for (size_t i = 0; i < swapChain.getImageCount(); i++) {
+        logger::debug(cameraTransformBuffers[i].buffer);
+        mainLayout[2].data[i][0].buffer = cameraTransformBuffers[i].buffer;
+    }
+
+    pipeline = std::make_unique<WvkPipeline>(device, swapChain, swapChain.getRenderPass(),
+                                             "triangle.vert.spv", "triangle.frag.spv",
+                                             mainDescriptor,
+                                             WvkPipeline::defaultPipelineConfigInfo());
+
+    shadowPipeline = std::make_unique<WvkPipeline>(device, swapChain, swapChain.getShadowRenderPass(),
+                                             "triangle.vert.spv", "",
+                                             mainDescriptor,
+                                             WvkPipeline::defaultPipelineConfigInfo());
+}
+
 void WvkApplication::createCommandBuffers() {
     uint32_t imageCount = swapChain.getImageCount();
     commandBuffers.resize(imageCount);
@@ -128,51 +203,55 @@ void WvkApplication::freeCommandBuffers() {
     commandBuffers.clear();
 }
 
-void mainRenderPass() {
+void WvkApplication::updateCamera(int imageIndex, VkExtent2D extent, float offset) {
+    float rotation = (float) frame / 1000.f;
 
+    UniformBufferObject ubo{};
+    ubo.model = glm::rotate(glm::mat4(1.0f), rotation * glm::radians(90.f), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f + offset), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.projection = glm::perspective(glm::radians(45.0f), (float) extent.width / (float) extent.height, 0.1f, 10.0f);
+    ubo.projection[1][1] *= -1;
+
+    void *pData;
+    vkMapMemory(device.getDevice(), cameraTransformBuffers[imageIndex].memory, 0, sizeof(ubo), 0, &pData);
+    memcpy(pData, &ubo, sizeof(ubo));
+    vkUnmapMemory(device.getDevice(), cameraTransformBuffers[imageIndex].memory);
 }
 
-void WvkApplication::recordCommandBuffer(int imageIndex) {
+void WvkApplication::recordShadowRenderPass(int imageIndex) {
     VkCommandBuffer commandBuffer = commandBuffers[imageIndex];
-
-    // Begin recording to the command buffer
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-    VkResult result = vkBeginCommandBuffer(commandBuffer, &beginInfo);
-    checkVulkanError(result, "failed to begin command buffer");
-
-    // Begin the light render pass
 
     // Begin the main render pass
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = swapChain.getRenderPass();
-    renderPassInfo.framebuffer = swapChain.getFramebuffer(imageIndex);
+    renderPassInfo.renderPass = swapChain.getShadowRenderPass();
+    renderPassInfo.framebuffer = swapChain.getShadowFramebuffer();
     renderPassInfo.renderArea.offset = {0, 0};
     renderPassInfo.renderArea.extent = swapChain.getExtent();
 
-    std::array<VkClearValue, 3> clearValues{};
-    clearValues[0].color = {0.01f, 0.01f, 0.01f, 1.0f};
-    clearValues[1].depthStencil = {1.f, 0};
-    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-    renderPassInfo.pClearValues = clearValues.data();
+    VkClearValue clearValue{};
+    clearValue.depthStencil = {1.f, 0};
+    renderPassInfo.clearValueCount = 1;
+    renderPassInfo.pClearValues = &clearValue;
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    VkExtent2D extent = swapChain.getExtent();
 
     // Set dynamic state for pipeline
     VkViewport viewport{};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
-    viewport.width = static_cast<float>(swapChain.getExtent().width);
-    viewport.height = static_cast<float>(swapChain.getExtent().height);
+    viewport.width = static_cast<float>(extent.width);
+    viewport.height = static_cast<float>(extent.height);
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
     VkRect2D scissor{{0, 0}, swapChain.getExtent()};
     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    pipeline.bind(commandBuffer, imageIndex);
+    updateCamera(imageIndex, extent, -0.4f);
+    shadowPipeline->bind(commandBuffer, imageIndex);
 
     for (WvkModel *model : models) {
         model->bind(commandBuffer);
@@ -185,6 +264,71 @@ void WvkApplication::recordCommandBuffer(int imageIndex) {
     }
 
     vkCmdEndRenderPass(commandBuffer);
+}
+
+void WvkApplication::recordMainRenderPass(int imageIndex) {
+    VkCommandBuffer commandBuffer = commandBuffers[imageIndex];
+
+    // Begin the main render pass
+    VkRenderPassBeginInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = swapChain.getRenderPass();
+    renderPassInfo.framebuffer = swapChain.getFramebuffer(imageIndex);
+    renderPassInfo.renderArea.offset = {0, 0};
+    renderPassInfo.renderArea.extent = swapChain.getExtent();
+
+    std::array<VkClearValue, 2> clearValues{};
+    clearValues[0].color = {0.01f, 0.01f, 0.01f, 1.0f};
+    clearValues[1].depthStencil = {1.f, 0};
+    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+    renderPassInfo.pClearValues = clearValues.data();
+
+    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    VkExtent2D extent = swapChain.getExtent();
+
+    // Set dynamic state for pipeline
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(extent.width);
+    viewport.height = static_cast<float>(extent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    VkRect2D scissor{{0, 0}, swapChain.getExtent()};
+    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+    updateCamera(imageIndex, extent, -0.f);
+    pipeline->bind(commandBuffer, imageIndex);
+
+    for (WvkModel *model : models) {
+        model->bind(commandBuffer);
+        model->draw(commandBuffer);
+    }
+
+    for (WvkSkeleton *skeleton : skeletons) {
+        skeleton->bind(commandBuffer);
+        skeleton->draw(commandBuffer);
+    }
+
+    vkCmdEndRenderPass(commandBuffer);
+}
+
+void WvkApplication::recordCommandBuffer(int imageIndex) {
+    VkCommandBuffer commandBuffer = commandBuffers[imageIndex];
+
+    // Begin recording to the command buffer
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+    checkVulkanError(vkBeginCommandBuffer(commandBuffer, &beginInfo), "failed to begin command buffer");
+
+    frame++;
+
+    recordShadowRenderPass(imageIndex);
+    recordMainRenderPass(imageIndex);
+
     checkVulkanError(vkEndCommandBuffer(commandBuffer), "failed to record command buffer");
 }
 

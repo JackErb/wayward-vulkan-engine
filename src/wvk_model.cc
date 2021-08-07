@@ -75,13 +75,10 @@ void WvkModel::initialize() {
 }
 
 WvkModel::~WvkModel() {
-    VkDevice dev = device.getDevice();
-
-    vertexBuffer.cleanup(dev);
-    vertexStagingBuffer.cleanup(dev);
-
-    indexBuffer.cleanup(dev);
-    indexStagingBuffer.cleanup(dev);
+    vertexBuffer.cleanup();
+    vertexStagingBuffer.cleanup();
+    indexBuffer.cleanup();
+    indexStagingBuffer.cleanup();
 }
 
 void WvkModel::createVertexBuffer() {

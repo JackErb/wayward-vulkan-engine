@@ -5,6 +5,7 @@
 #include "wvk_pipeline.h"
 #include "wvk_model.h"
 #include "wvk_skeleton.h"
+#include "wvk_sampler.h"
 
 #include <vector>
 
@@ -29,24 +30,46 @@ class WvkApplication {
     WvkApplication &operator=(const WvkApplication &) = delete;
 
     void run();
-  
+
   private:
+    void createPipelineResources();
+    void createPipelines();
+
     void createCommandBuffers();
     void freeCommandBuffers();
     void recordCommandBuffer(int imageIndex);
 
+    void recordShadowRenderPass(int imageIndex);
+    void recordMainRenderPass(int imageIndex);
+
+    void updateCamera(int imageIndex, VkExtent2D extent, float offset);
+
     void loadModels();
     void imguiInit();
+
+    uint64_t frame = 0;
 
     WvkWindow window{WIDTH, HEIGHT, "Hello Vulkan!"};
     WvkDevice device{window};
     WvkSwapchain swapChain{device, window.getExtent()};
-    WvkPipeline pipeline{device, swapChain, swapChain.getRenderPass(), "triangle.vert.spv", "triangle.frag.spv", WvkPipeline::defaultPipelineConfigInfo(swapChain.getExtent())};
+
+    //WvkPipeline pipeline{device, swapChain, swapChain.getRenderPass(), "triangle.vert.spv", "triangle.frag.spv", WvkPipeline::defaultPipelineConfigInfo()};
+    //WvkPipeline shadowPipeline{device, swapChain, swapChain.getShadowRenderPass(), "triangle.vert.spv", "", WvkPipeline::defaultPipelineConfigInfo()};
+    std::unique_ptr<WvkPipeline> pipeline;
+    std::unique_ptr<WvkPipeline> shadowPipeline;
 
     std::vector<WvkModel*> models;
     std::vector<WvkSkeleton*> skeletons;
 
     std::vector<VkCommandBuffer> commandBuffers;
+
+    /* Pipeline descriptor set resources */
+    Sampler textureSampler{device};
+
+    const std::vector<std::string> images = {"viking_room.png", "hazel.png"};
+    std::vector<Image> textureImages;
+
+    std::vector<Buffer> cameraTransformBuffers;
 };
 
 };

@@ -58,7 +58,7 @@ class WvkDevice {
     void createBuffer(VkDeviceSize size,
                       VkBufferUsageFlags usage,
                       VkMemoryPropertyFlags properties,
-                      WvkBuffer &buffer);
+                      Buffer &buffer);
 
     void createImage(uint32_t width,          uint32_t height,
                      VkFormat format,         VkImageTiling tiling,
@@ -70,7 +70,7 @@ class WvkDevice {
     void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
     void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
-    void copyBuffer(WvkBuffer src, WvkBuffer dst, VkDeviceSize size);
+    void copyBuffer(Buffer src, Buffer dst, VkDeviceSize size);
 
     VkCommandBuffer beginSingleTimeCommands();
     void endSingleTimeCommands(VkCommandBuffer commandBuffer);

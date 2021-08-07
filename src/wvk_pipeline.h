@@ -20,6 +20,9 @@
 
 namespace wvk {
 
+#define MAX_DESCRIPTOR_COUNT 10 // max size of descriptor array
+#define MAX_DESCRIPTORS      10 // max number of descriptors for each type (buffer, image, sampler)
+
 struct PipelineConfigInfo {
   VkPipelineViewportStateCreateInfo viewportInfo;
   VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo;
@@ -30,7 +33,34 @@ struct PipelineConfigInfo {
   VkPipelineDepthStencilStateCreateInfo depthStencilInfo;
   std::vector<VkDynamicState> dynamicStateEnables;
   VkPipelineDynamicStateCreateInfo dynamicStateInfo;
+
   uint32_t subpass = 0;
+};
+
+struct DescriptorLayoutInfo {
+    VkDescriptorType type;
+    uint32_t count;
+    VkShaderStageFlags stageFlags;
+
+    // If true, this descriptor  should be unique for each frame of the swap chain.
+    //          The length of the data array must be 1
+    // If false, the same data will be used for each frame.
+    //           The length of the data array must be the swap chain's image count
+    // Cases this should be true:
+    // - Data that is mutable (can change from frame to frame)
+    // - Framebuffer attachments from previous render passes
+    bool unique = false;
+
+    // TODO: This is messy and unsafe. Find more suitable design
+    union {
+        VkSampler   sampler;
+        VkImageView imageView;
+        VkBuffer    buffer;
+    } data[WvkSwapchain::MAX_FRAMES_IN_FLIGHT][MAX_DESCRIPTOR_COUNT];
+};
+
+struct DescriptorSetInfo {
+    std::vector<DescriptorLayoutInfo> layoutBindings;
 };
 
 struct UniformBufferObject {
@@ -43,15 +73,16 @@ class WvkPipeline {
   public:
     WvkPipeline(WvkDevice& device, WvkSwapchain& swapChain, VkRenderPass renderPass,
                 std::string vertShader, std::string fragShader,
+                const DescriptorSetInfo &descriptorInfo,
                 const PipelineConfigInfo &config);
     ~WvkPipeline();
 
     WvkPipeline(const WvkPipeline&) = delete;
     WvkPipeline& operator=(const WvkPipeline&) = delete;
 
-    static PipelineConfigInfo defaultPipelineConfigInfo(VkExtent2D extent);
+    static PipelineConfigInfo defaultPipelineConfigInfo();
 
-    void updateUniformBuffer(int imageIndex);
+    void updateUniformBuffer(int imageIndex, UniformBufferObject ubo);
     void bind(VkCommandBuffer commandBuffer, int imageIndex);
 
   private:
@@ -59,7 +90,6 @@ class WvkPipeline {
 
     void createPipelineLayout();
     void createDescriptorPool();
-    void createDescriptorResources();
     void createDescriptorSets();
     VkShaderModule createShaderModule(const std::string &filename);
 
@@ -69,6 +99,7 @@ class WvkPipeline {
 
     PipelineConfigInfo pipelineConfig;
 
+    DescriptorSetInfo descriptorSetInfo;
     VkDescriptorSetLayout descriptorSetLayout;
     VkPipelineLayout pipelineLayout;
 
@@ -76,14 +107,8 @@ class WvkPipeline {
     std::vector<VkDescriptorSet> descriptorSets;
 
     VkPipeline graphicsPipeline;
-    VkShaderModule vertShaderModule;
-    VkShaderModule fragShaderModule;
-
-    VkSampler textureSampler;
-    std::vector<WvkBuffer> uniformBuffers;
-
-    const std::vector<std::string> images = {"viking_room.png", "hazel.png"};
-    std::vector<std::unique_ptr<WvkImage>> textureImages;
+    VkShaderModule vertShaderModule = VK_NULL_HANDLE;
+    VkShaderModule fragShaderModule = VK_NULL_HANDLE;
 };
 
 }

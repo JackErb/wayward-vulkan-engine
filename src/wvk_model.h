@@ -60,11 +60,11 @@ private:
 
     WvkDevice& device;
 
-    WvkBuffer vertexBuffer;
-    WvkBuffer vertexStagingBuffer;
+    Buffer vertexBuffer;
+    Buffer vertexStagingBuffer;
 
-    WvkBuffer indexBuffer;
-    WvkBuffer indexStagingBuffer;
+    Buffer indexBuffer;
+    Buffer indexStagingBuffer;
 };
 
 }

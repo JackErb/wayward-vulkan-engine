@@ -279,7 +279,9 @@ uint32_t WvkDevice::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags pr
 }
 
 void WvkDevice::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
-                             WvkBuffer &buffer) {
+                             Buffer &buffer) {
+    buffer.device = device;
+
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = size;
@@ -490,7 +492,7 @@ void WvkDevice::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width
     endSingleTimeCommands(commandBuffer);
 }
 
-void WvkDevice::copyBuffer(WvkBuffer src, WvkBuffer dst, VkDeviceSize size) {
+void WvkDevice::copyBuffer(Buffer src, Buffer dst, VkDeviceSize size) {
     VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
     VkBufferCopy bufferCopy{};

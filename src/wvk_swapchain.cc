@@ -137,6 +137,11 @@ void WvkSwapchain::createSwapchain() {
         imageCount = swapchainDetails.capabilities.maxImageCount;
     }
 
+    if (imageCount > MAX_FRAMES_IN_FLIGHT) {
+        logger::debug("Image count is > MAX_FRAMES_IN_FLIGHT");
+        imageCount = MAX_FRAMES_IN_FLIGHT;
+    }
+
     // Create the swapchain
     VkSwapchainCreateInfoKHR createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -216,11 +221,11 @@ void WvkSwapchain::createShadowRenderPass() {
     depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
 
     VkAttachmentReference depthAttachmentRef;
     depthAttachmentRef.attachment = 0;
-    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_GENERAL;
 
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
