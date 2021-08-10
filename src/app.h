@@ -6,6 +6,7 @@
 #include "wvk_model.h"
 #include "wvk_skeleton.h"
 #include "wvk_sampler.h"
+#include "game/game_structs.h"
 
 #include <vector>
 
@@ -32,6 +33,9 @@ class WvkApplication {
     void run();
 
     bool isKeyPressed(int);
+    glm::vec2 getCursorPos();
+
+    void setCamera(Camera *camera) { this->camera = camera; }
 
   private:
     void createPipelineResources();
@@ -44,7 +48,7 @@ class WvkApplication {
     void recordShadowRenderPass(int imageIndex);
     void recordMainRenderPass(int imageIndex);
 
-    void updateCamera(int imageIndex, VkExtent2D extent, float offset);
+    void writeCameraTransform(VkExtent2D extent, VkDeviceMemory memory);
 
     void loadModels();
     void imguiInit();
@@ -54,6 +58,8 @@ class WvkApplication {
     WvkWindow window{WIDTH, HEIGHT, "Hello Vulkan!"};
     WvkDevice device{window};
     WvkSwapchain swapChain{device, window.getExtent()};
+
+    Camera *camera = nullptr;
 
     //WvkPipeline pipeline{device, swapChain, swapChain.getRenderPass(), "triangle.vert.spv", "triangle.frag.spv", WvkPipeline::defaultPipelineConfigInfo()};
     //WvkPipeline shadowPipeline{device, swapChain, swapChain.getShadowRenderPass(), "triangle.vert.spv", "", WvkPipeline::defaultPipelineConfigInfo()};
@@ -72,13 +78,6 @@ class WvkApplication {
     const std::vector<std::string> images = {"hazel.png", "viking_room.png"};
     std::vector<Image> textureImages;
 
-    struct {
-        glm::vec3 position; // position in worldspace
-        glm::vec3 rotation; // components:  pitch, yaw, roll
-        glm::vec3 direction;
-
-        glm::vec2 mousePosition;
-    } camera;
     std::vector<Buffer> cameraTransformBuffers;
 };
 

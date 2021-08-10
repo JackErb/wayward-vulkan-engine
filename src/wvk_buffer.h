@@ -11,6 +11,7 @@ struct Buffer {
 
     VkBuffer buffer;
     VkDeviceMemory memory;
+    VkDeviceSize size;
 
     VkDevice device = VK_NULL_HANDLE;
 

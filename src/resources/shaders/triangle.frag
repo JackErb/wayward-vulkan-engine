@@ -15,10 +15,10 @@ layout(location = 0) out vec4 outColor;
 void main() {
     outColor = texture(sampler2D(textures[textureIndex], texSampler), inTexCoord);
 
-    /*vec2 depthPosition = vec2(inPosition.x / inPosition.w, inPosition.y / inPosition.w);
+    vec2 depthPosition = vec2(inPosition.x, inPosition.y);
 
     vec4 depthColor = texture(depthSampler, depthPosition);
     float depth = depthColor.r;
 
-    outColor = vec4(depth, depth, depth, 1.f);*/
+    outColor = vec4(depth, depth, depth, 1.f);
 }

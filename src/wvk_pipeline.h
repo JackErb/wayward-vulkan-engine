@@ -3,6 +3,7 @@
 #include "wvk_device.h"
 #include "wvk_image.h"
 #include "wvk_buffer.h"
+#include "game/game_structs.h"
 
 #include "glm.h"
 
@@ -52,20 +53,15 @@ struct DescriptorLayoutInfo {
     struct {
         VkSampler         sampler = VK_NULL_HANDLE;
         VkImageView     imageView = VK_NULL_HANDLE;
-        VkBuffer           buffer = VK_NULL_HANDLE;
         VkImageLayout imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
+        VkBuffer     buffer = VK_NULL_HANDLE;
+        VkDeviceSize   size = 0;
     } data[WvkSwapchain::MAX_FRAMES_IN_FLIGHT][MAX_DESCRIPTOR_COUNT];
 };
 
 struct DescriptorSetInfo {
     std::vector<DescriptorLayoutInfo> layoutBindings;
-};
-
-struct UniformBufferObject {
-    glm::mat4 model;
-    glm::mat4 view;
-    glm::mat4 projection;
 };
 
 class WvkPipeline {
@@ -81,7 +77,7 @@ class WvkPipeline {
 
     static PipelineConfigInfo defaultPipelineConfigInfo();
 
-    void updateUniformBuffer(int imageIndex, UniformBufferObject ubo);
+    void updateUniformBuffer(int imageIndex, TransformMatrices ubo);
     void bind(VkCommandBuffer commandBuffer, int imageIndex);
 
   private:

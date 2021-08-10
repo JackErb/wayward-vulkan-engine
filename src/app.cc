@@ -3,13 +3,13 @@
 #include "wvk_helper.h"
 #include "glm.h"
 
+#include "game/controller.h"
+
 #include <imgui_impl_vulkan.h>
 #include <imgui_impl_glfw.h>
 
 #include <thread>
 #include <chrono>
-
-#include "glm.h"
 
 namespace wvk {
 
@@ -98,7 +98,11 @@ void WvkApplication::run() {
     const int FRAME_INTERVAL = 240;
     long timeCount = 0;
 
-    while (!glfwWindowShouldClose(window.getGlfwWindow())) {
+    bool forceQuit = false;
+
+    wayward::DebugController controller{this};
+
+    while (!forceQuit && !glfwWindowShouldClose(window.getGlfwWindow())) {
         auto start = getTime();
 
         glfwPollEvents();
@@ -112,10 +116,16 @@ void WvkApplication::run() {
         auto end = getTime();
         timeCount += duration_cast<microseconds>(end - start).count();
 
+        controller.update();
+
         if (++frame % FRAME_INTERVAL == 0) {
             int avg = timeCount / FRAME_INTERVAL;
             logger::debug("average frame time: " + std::to_string(avg) + " microseconds");
             timeCount = 0;
+        }
+
+        if (isKeyPressed(GLFW_KEY_ESCAPE)) {
+            forceQuit = true;
         }
 
         std::this_thread::sleep_for(16.6ms - duration_cast<milliseconds>(end-start));
@@ -129,7 +139,7 @@ void WvkApplication::createPipelineResources() {
     }
 
     // Allocate uniform buffers (one per swapchain image)
-    VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+    VkDeviceSize bufferSize = sizeof(TransformMatrices);
     for (size_t i = 0; i < swapChain.getImageCount(); i++) {
         cameraTransformBuffers.emplace_back();
         device.createBuffer(bufferSize,
@@ -155,6 +165,7 @@ void WvkApplication::createPipelines() {
     shadowLayout[0].unique = true;
     for (size_t i = 0; i < swapChain.getImageCount(); i++) {
         shadowLayout[0].data[i][0].buffer = cameraTransformBuffers[i].buffer;
+        shadowLayout[0].data[i][0].size = cameraTransformBuffers[i].size;
     }
 
     shadowPipeline = std::make_unique<WvkPipeline>(device, swapChain, swapChain.getShadowRenderPass(),
@@ -175,6 +186,7 @@ void WvkApplication::createPipelines() {
     mainLayout[0].unique = true;
     for (size_t i = 0; i < swapChain.getImageCount(); i++) {
         mainLayout[0].data[i][0].buffer = cameraTransformBuffers[i].buffer;
+        mainLayout[0].data[i][0].size = cameraTransformBuffers[i].size;
     }
 
     mainLayout[1].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
@@ -227,80 +239,16 @@ void WvkApplication::freeCommandBuffers() {
     commandBuffers.clear();
 }
 
-void WvkApplication::updateCamera(int imageIndex, VkExtent2D extent, float offset) {
-    /*float rotation = (float) frame / 1000.f;
+void WvkApplication::writeCameraTransform(VkExtent2D extent, VkDeviceMemory memory) {
+    if (camera == nullptr) return;
 
-    UniformBufferObject ubo{};
-    ubo.model = glm::rotate(glm::mat4(1.0f), rotation * glm::radians(90.f), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f + offset), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.projection = glm::perspective(glm::radians(45.0f), (float) extent.width / (float) extent.height, 0.2f, 100.0f);
-    ubo.projection[1][1] *= -1;*/
-
-    static glm::vec3 up = glm::vec3(0.0f, 0.0f, 1.0f);
-
-    if (frame == 1) {
-        camera.position = glm::vec3(2.0f, 0.0f, 0.5f);
-        camera.rotation.x = glm::radians(180.0f);
-    }
-
-    const float speed = 0.02f;
-
-    if (isKeyPressed(GLFW_KEY_W)) {
-        camera.position += speed * camera.direction;
-    }
-
-    if (isKeyPressed(GLFW_KEY_S)) {
-        camera.position += -1 * speed * camera.direction;
-    }
-
-    if (isKeyPressed(GLFW_KEY_A)) {
-        camera.position += speed * glm::cross(camera.direction, up);
-    }
-
-    if (isKeyPressed(GLFW_KEY_D)) {
-        camera.position += -1 * speed * glm::cross(camera.direction, up);
-    }
-
-
-    double cx, cy;
-    glfwGetCursorPos(window.getGlfwWindow(), &cx, &cy);
-
-    glm::vec2 mousePosition = glm::vec2(cx, cy);
-    if (glm::distance(mousePosition, camera.mousePosition) > 2.0) {
-        camera.rotation.x += -1 * (camera.mousePosition.x - mousePosition.x) / 400;
-        camera.rotation.z += -1 * (camera.mousePosition.y - mousePosition.y) / 400;
-    }
-
-    camera.mousePosition.x = cx;
-    camera.mousePosition.y = cy;
-
-    if (isKeyPressed(GLFW_KEY_Q)) {
-        window.enableCursor(true);
-    }
-
-
-    float fov = glm::radians(60.0f);
     float aspectRatio = (float) extent.width / (float) extent.height;
-
-    float zNear = 0.1f;
-    float zFar = 100.0f;
-
-    glm::mat4 rotationMatrix = glm::mat4(1.0f);
-    rotationMatrix = glm::rotate(rotationMatrix, camera.rotation.x, up);
-    rotationMatrix = glm::rotate(rotationMatrix, camera.rotation.z, glm::vec3(0.0f, 1.0f, 0.0f));
-
-    camera.direction = rotationMatrix * glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
-
-    UniformBufferObject ubo{};
-    ubo.model = glm::mat4(1.0f);
-    ubo.view = glm::lookAt(camera.position, camera.position + camera.direction, up);
-    ubo.projection = glm::perspective(fov, aspectRatio, zNear, zFar);
-    ubo.projection[1][1] *= -1;
+    TransformMatrices matrices = camera->transform.perspectiveProjection(aspectRatio);
 
     void *pData;
-    vkMapMemory(device.getDevice(), cameraTransformBuffers[imageIndex].memory, 0, sizeof(ubo), 0, &pData);
-    memcpy(pData, &ubo, sizeof(ubo));
-    vkUnmapMemory(device.getDevice(), cameraTransformBuffers[imageIndex].memory);
+    vkMapMemory(device.getDevice(), memory, 0, sizeof(matrices), 0, &pData);
+    memcpy(pData, &matrices, sizeof(matrices));
+    vkUnmapMemory(device.getDevice(), memory);
 }
 
 void WvkApplication::recordShadowRenderPass(int imageIndex) {
@@ -336,7 +284,7 @@ void WvkApplication::recordShadowRenderPass(int imageIndex) {
     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    updateCamera(imageIndex, extent, 0.f);
+    writeCameraTransform(extent, cameraTransformBuffers[imageIndex].memory);
     shadowPipeline->bind(commandBuffer, imageIndex);
 
     for (WvkModel *model : models) {
@@ -385,7 +333,7 @@ void WvkApplication::recordMainRenderPass(int imageIndex) {
     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    updateCamera(imageIndex, extent, 0.f);
+    writeCameraTransform(extent, cameraTransformBuffers[imageIndex].memory);
     pipeline->bind(commandBuffer, imageIndex);
 
     for (WvkModel *model : models) {
@@ -459,6 +407,13 @@ void WvkApplication::loadModels() {
 bool WvkApplication::isKeyPressed(int key) {
     int state = glfwGetKey(window.getGlfwWindow(), key);
     return state == GLFW_PRESS;
+}
+
+glm::vec2 WvkApplication::getCursorPos() {
+    double cx, cy;
+    glfwGetCursorPos(window.getGlfwWindow(), &cx, &cy);
+
+    return glm::vec2(cx, cy);
 }
 
 }

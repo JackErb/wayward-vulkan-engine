@@ -326,7 +326,7 @@ void WvkPipeline::createDescriptorSets() {
                     for (size_t j = 0; j < layout->count; j++) {
                         bufferInfos[index][j].buffer = layout->data[descriptorSetImageIndex][j].buffer;
                         bufferInfos[index][j].offset = 0;
-                        bufferInfos[index][j].range = sizeof(UniformBufferObject);
+                        bufferInfos[index][j].range = layout->data[descriptorSetImageIndex][j].size;
                     }
 
                     descriptor->pBufferInfo = bufferInfos[index];

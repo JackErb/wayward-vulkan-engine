@@ -281,6 +281,7 @@ uint32_t WvkDevice::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags pr
 void WvkDevice::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
                              Buffer &buffer) {
     buffer.device = device;
+    buffer.size = size;
 
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
