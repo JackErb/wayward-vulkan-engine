@@ -39,6 +39,10 @@ WvkSwapchain::~WvkSwapchain() {
         vkDestroyFence(dev, inFlightFences[i], nullptr);
     }
 
+    vkDestroyImageView(dev, shadowImageView, nullptr);
+    vkDestroyImage(dev, shadowImage, nullptr);
+    vkFreeMemory(dev, shadowImageMemory, nullptr);
+
     vkDestroyImageView(dev, shadowDepthImageView, nullptr);
     vkDestroyImage(dev, shadowDepthImage, nullptr);
     vkFreeMemory(dev, shadowDepthImageMemory, nullptr);
@@ -205,32 +209,55 @@ void WvkSwapchain::createDepthResources() {
 
     device.createImage(swapChainExtent.width, swapChainExtent.height,
                        VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
-                       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                        shadowDepthImage, shadowDepthImageMemory);
 
     shadowDepthImageView = device.createImageView(shadowDepthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+    device.createImage(swapChainExtent.width, swapChainExtent.height,
+                       imageFormat, VK_IMAGE_TILING_OPTIMAL,
+                       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                       shadowImage, shadowImageMemory);
+
+    shadowImageView = device.createImageView(shadowImage, imageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
 void WvkSwapchain::createShadowRenderPass() {
+    // Main color attachment
+    VkAttachmentDescription colorAttachment{};
+    colorAttachment.format = imageFormat;
+    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference colorAttachmentRef;
+    colorAttachmentRef.attachment = 0;
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
     VkAttachmentDescription depthAttachment{};
     depthAttachment.format = depthFormat;
     depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
     VkAttachmentReference depthAttachmentRef;
-    depthAttachmentRef.attachment = 0;
-    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_GENERAL;
+    depthAttachmentRef.attachment = 1;
+    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 0;
-    subpass.pColorAttachments = nullptr;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &colorAttachmentRef;
     subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
     VkSubpassDependency dependency{};
@@ -241,7 +268,7 @@ void WvkSwapchain::createShadowRenderPass() {
     dependency.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     dependency.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-    std::array<VkAttachmentDescription, 1> attachments = {depthAttachment};
+    std::array<VkAttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
     std::array<VkSubpassDescription, 1> subpasses = {subpass};
     std::array<VkSubpassDependency, 1> dependencies = {dependency};
 
@@ -264,7 +291,7 @@ void WvkSwapchain::createRenderPass() {
     colorAttachment.format = imageFormat;
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -298,10 +325,10 @@ void WvkSwapchain::createRenderPass() {
     VkSubpassDependency dependency{};
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
     dependency.dstSubpass = 0;
-    dependency.srcStageMask =  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dependency.srcStageMask =  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     dependency.srcAccessMask = 0;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
     std::array<VkAttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
     std::array<VkSubpassDescription, 1> subpasses = {subpass};
@@ -344,12 +371,14 @@ void WvkSwapchain::createSwapchainFramebuffers() {
         framebuffers.push_back(framebuffer);
     }
 
+    std::array<VkImageView, 2> shadowAttachments = {shadowImageView, shadowDepthImageView};
+
     VkFramebufferCreateInfo framebufferInfo{};
     framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
     framebufferInfo.flags = 0;
     framebufferInfo.renderPass = shadowRenderPass;
-    framebufferInfo.attachmentCount = 1;
-    framebufferInfo.pAttachments = &shadowDepthImageView;
+    framebufferInfo.attachmentCount = static_cast<uint32_t>(shadowAttachments.size());
+    framebufferInfo.pAttachments = shadowAttachments.data();
     framebufferInfo.width = swapChainExtent.width;
     framebufferInfo.height = swapChainExtent.height;
     framebufferInfo.layers = 1;

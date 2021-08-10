@@ -4,13 +4,10 @@
 #include "wvk_image.h"
 #include "wvk_buffer.h"
 
+#include "glm.h"
+
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
-
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_LEFT_HANDED
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 
 #include <string>
 #include <vector>
@@ -52,10 +49,12 @@ struct DescriptorLayoutInfo {
     bool unique = false;
 
     // TODO: This is messy and unsafe. Find more suitable design
-    union {
-        VkSampler   sampler;
-        VkImageView imageView;
-        VkBuffer    buffer;
+    struct {
+        VkSampler         sampler = VK_NULL_HANDLE;
+        VkImageView     imageView = VK_NULL_HANDLE;
+        VkBuffer           buffer = VK_NULL_HANDLE;
+        VkImageLayout imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
     } data[WvkSwapchain::MAX_FRAMES_IN_FLIGHT][MAX_DESCRIPTOR_COUNT];
 };
 

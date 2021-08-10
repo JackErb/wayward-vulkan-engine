@@ -31,6 +31,8 @@ class WvkSwapchain {
     VkFramebuffer getShadowFramebuffer() { return shadowFramebuffer; }
     VkExtent2D getExtent() { return swapChainExtent; }
     uint32_t getImageCount() { return images.size(); }
+    VkImageView getShadowImageView() { return shadowImageView; }
+    VkImageView getShadowDepthImageView() { return shadowDepthImageView; }
 
     uint32_t acquireNextImage();
     void submitCommands(VkCommandBuffer buffer, uint32_t imageIndex);
@@ -70,6 +72,10 @@ class WvkSwapchain {
     VkImage depthImage;
     VkDeviceMemory depthImageMemory;
     VkImageView depthImageView;
+
+    VkImage shadowImage;
+    VkDeviceMemory shadowImageMemory;
+    VkImageView shadowImageView;
 
     VkImage shadowDepthImage;
     VkDeviceMemory shadowDepthImageMemory;

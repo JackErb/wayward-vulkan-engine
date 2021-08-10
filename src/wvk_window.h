@@ -23,6 +23,7 @@ class WvkWindow {
     GLFWwindow *getGlfwWindow() { return window; }
 
     void createWindowSurface(VkInstance instance, VkSurfaceKHR *surface);
+    void enableCursor(bool enabled);
 
   private:
     void initWindow();

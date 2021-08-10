@@ -13,11 +13,26 @@ namespace wvk {
 
 WvkWindow::WvkWindow(int width, int height, std::string name) : width{width}, height{height}, name{name} {
     initWindow();
+
+    enableCursor(false);
 }
 
 WvkWindow::~WvkWindow() {
     glfwDestroyWindow(window);
     glfwTerminate();
+}
+
+void WvkWindow::enableCursor(bool enabled) {
+    if (enabled) {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    } else {
+        // Note: GLFW_CURSOR_HIDDEN may be another suitable option
+
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        if (glfwRawMouseMotionSupported()) {
+            glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+        }
+    }
 }
 
 void WvkWindow::createWindowSurface(VkInstance instance, VkSurfaceKHR *surface) {

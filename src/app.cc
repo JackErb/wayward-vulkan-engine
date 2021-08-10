@@ -43,6 +43,7 @@ WvkApplication::~WvkApplication() {
     }
 
     textureSampler.cleanup();
+    depthSampler.cleanup();
 
     for (WvkModel *model : models) {
         delete model;
@@ -110,13 +111,12 @@ void WvkApplication::run() {
 
         auto end = getTime();
         timeCount += duration_cast<microseconds>(end - start).count();
-        if (frame % FRAME_INTERVAL == 0) {
+
+        if (++frame % FRAME_INTERVAL == 0) {
             int avg = timeCount / FRAME_INTERVAL;
             logger::debug("average frame time: " + std::to_string(avg) + " microseconds");
             timeCount = 0;
         }
-
-        frame++;
 
         std::this_thread::sleep_for(16.6ms - duration_cast<milliseconds>(end-start));
     }
@@ -128,7 +128,6 @@ void WvkApplication::createPipelineResources() {
         textureImages.push_back(Image{device, images[i]});
     }
 
-    logger::debug("uniform buffers");
     // Allocate uniform buffers (one per swapchain image)
     VkDeviceSize bufferSize = sizeof(UniformBufferObject);
     for (size_t i = 0; i < swapChain.getImageCount(); i++) {
@@ -143,41 +142,66 @@ void WvkApplication::createPipelineResources() {
 void WvkApplication::createPipelines() {
     PipelineConfigInfo defaultConfig = WvkPipeline::defaultPipelineConfigInfo();
 
+    // Shadow mapping pipeline
+
+    DescriptorSetInfo shadowDescriptor{};
+    auto &shadowLayout = shadowDescriptor.layoutBindings;
+
+    shadowLayout.resize(1);
+
+    shadowLayout[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    shadowLayout[0].count = 1;
+    shadowLayout[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    shadowLayout[0].unique = true;
+    for (size_t i = 0; i < swapChain.getImageCount(); i++) {
+        shadowLayout[0].data[i][0].buffer = cameraTransformBuffers[i].buffer;
+    }
+
+    shadowPipeline = std::make_unique<WvkPipeline>(device, swapChain, swapChain.getShadowRenderPass(),
+                                                   "shadow.vert.spv", "empty.frag.spv",
+                                                   shadowDescriptor,
+                                                   WvkPipeline::defaultPipelineConfigInfo());
+
+    // Main render pass pipeline
+
     DescriptorSetInfo mainDescriptor{};
     auto &mainLayout = mainDescriptor.layoutBindings;
 
-    mainLayout.resize(3);
+    mainLayout.resize(4);
 
-    mainLayout[0].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-    mainLayout[0].count = textureImages.size();
-    mainLayout[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    mainLayout[0].unique = false;
-    for (size_t i = 0; i < textureImages.size(); i++) {
-        mainLayout[0].data[0][i].imageView = textureImages[i].imageView;
+    mainLayout[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    mainLayout[0].count = 1;
+    mainLayout[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    mainLayout[0].unique = true;
+    for (size_t i = 0; i < swapChain.getImageCount(); i++) {
+        mainLayout[0].data[i][0].buffer = cameraTransformBuffers[i].buffer;
     }
 
-    mainLayout[1].type = VK_DESCRIPTOR_TYPE_SAMPLER;
-    mainLayout[1].count = 1;
+    mainLayout[1].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    mainLayout[1].count = textureImages.size();
     mainLayout[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     mainLayout[1].unique = false;
-    mainLayout[1].data[0][0].sampler = textureSampler.sampler;
-
-    mainLayout[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    mainLayout[2].count = 1;
-    mainLayout[2].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    mainLayout[2].unique = true;
-    for (size_t i = 0; i < swapChain.getImageCount(); i++) {
-        logger::debug(cameraTransformBuffers[i].buffer);
-        mainLayout[2].data[i][0].buffer = cameraTransformBuffers[i].buffer;
+    for (size_t i = 0; i < textureImages.size(); i++) {
+        mainLayout[1].data[0][i].imageView = textureImages[i].imageView;
+        mainLayout[1].data[0][i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     }
+
+    mainLayout[2].type = VK_DESCRIPTOR_TYPE_SAMPLER;
+    mainLayout[2].count = 1;
+    mainLayout[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    mainLayout[2].unique = false;
+    mainLayout[2].data[0][0].sampler = textureSampler.sampler;
+
+    mainLayout[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    mainLayout[3].count = 1;
+    mainLayout[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    mainLayout[3].unique = false;
+    mainLayout[3].data[0][0].imageView = swapChain.getShadowDepthImageView();
+    mainLayout[3].data[0][0].sampler = depthSampler.sampler;
+    mainLayout[3].data[0][0].imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
     pipeline = std::make_unique<WvkPipeline>(device, swapChain, swapChain.getRenderPass(),
                                              "triangle.vert.spv", "triangle.frag.spv",
-                                             mainDescriptor,
-                                             WvkPipeline::defaultPipelineConfigInfo());
-
-    shadowPipeline = std::make_unique<WvkPipeline>(device, swapChain, swapChain.getShadowRenderPass(),
-                                             "triangle.vert.spv", "",
                                              mainDescriptor,
                                              WvkPipeline::defaultPipelineConfigInfo());
 }
@@ -204,12 +228,73 @@ void WvkApplication::freeCommandBuffers() {
 }
 
 void WvkApplication::updateCamera(int imageIndex, VkExtent2D extent, float offset) {
-    float rotation = (float) frame / 1000.f;
+    /*float rotation = (float) frame / 1000.f;
 
     UniformBufferObject ubo{};
     ubo.model = glm::rotate(glm::mat4(1.0f), rotation * glm::radians(90.f), glm::vec3(0.0f, 0.0f, 1.0f));
     ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f + offset), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.projection = glm::perspective(glm::radians(45.0f), (float) extent.width / (float) extent.height, 0.1f, 10.0f);
+    ubo.projection = glm::perspective(glm::radians(45.0f), (float) extent.width / (float) extent.height, 0.2f, 100.0f);
+    ubo.projection[1][1] *= -1;*/
+
+    static glm::vec3 up = glm::vec3(0.0f, 0.0f, 1.0f);
+
+    if (frame == 1) {
+        camera.position = glm::vec3(2.0f, 0.0f, 0.5f);
+        camera.rotation.x = glm::radians(180.0f);
+    }
+
+    const float speed = 0.02f;
+
+    if (isKeyPressed(GLFW_KEY_W)) {
+        camera.position += speed * camera.direction;
+    }
+
+    if (isKeyPressed(GLFW_KEY_S)) {
+        camera.position += -1 * speed * camera.direction;
+    }
+
+    if (isKeyPressed(GLFW_KEY_A)) {
+        camera.position += speed * glm::cross(camera.direction, up);
+    }
+
+    if (isKeyPressed(GLFW_KEY_D)) {
+        camera.position += -1 * speed * glm::cross(camera.direction, up);
+    }
+
+
+    double cx, cy;
+    glfwGetCursorPos(window.getGlfwWindow(), &cx, &cy);
+
+    glm::vec2 mousePosition = glm::vec2(cx, cy);
+    if (glm::distance(mousePosition, camera.mousePosition) > 2.0) {
+        camera.rotation.x += -1 * (camera.mousePosition.x - mousePosition.x) / 400;
+        camera.rotation.z += -1 * (camera.mousePosition.y - mousePosition.y) / 400;
+    }
+
+    camera.mousePosition.x = cx;
+    camera.mousePosition.y = cy;
+
+    if (isKeyPressed(GLFW_KEY_Q)) {
+        window.enableCursor(true);
+    }
+
+
+    float fov = glm::radians(60.0f);
+    float aspectRatio = (float) extent.width / (float) extent.height;
+
+    float zNear = 0.1f;
+    float zFar = 100.0f;
+
+    glm::mat4 rotationMatrix = glm::mat4(1.0f);
+    rotationMatrix = glm::rotate(rotationMatrix, camera.rotation.x, up);
+    rotationMatrix = glm::rotate(rotationMatrix, camera.rotation.z, glm::vec3(0.0f, 1.0f, 0.0f));
+
+    camera.direction = rotationMatrix * glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
+
+    UniformBufferObject ubo{};
+    ubo.model = glm::mat4(1.0f);
+    ubo.view = glm::lookAt(camera.position, camera.position + camera.direction, up);
+    ubo.projection = glm::perspective(fov, aspectRatio, zNear, zFar);
     ubo.projection[1][1] *= -1;
 
     void *pData;
@@ -229,10 +314,11 @@ void WvkApplication::recordShadowRenderPass(int imageIndex) {
     renderPassInfo.renderArea.offset = {0, 0};
     renderPassInfo.renderArea.extent = swapChain.getExtent();
 
-    VkClearValue clearValue{};
-    clearValue.depthStencil = {1.f, 0};
-    renderPassInfo.clearValueCount = 1;
-    renderPassInfo.pClearValues = &clearValue;
+    std::array<VkClearValue, 2> clearValues{};
+    clearValues[0].color = {0.01f, 0.01f, 0.01f, 1.0f};
+    clearValues[1].depthStencil = {1.f, 0};
+    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+    renderPassInfo.pClearValues = clearValues.data();
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -250,7 +336,7 @@ void WvkApplication::recordShadowRenderPass(int imageIndex) {
     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    updateCamera(imageIndex, extent, -0.4f);
+    updateCamera(imageIndex, extent, 0.f);
     shadowPipeline->bind(commandBuffer, imageIndex);
 
     for (WvkModel *model : models) {
@@ -299,7 +385,7 @@ void WvkApplication::recordMainRenderPass(int imageIndex) {
     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    updateCamera(imageIndex, extent, -0.f);
+    updateCamera(imageIndex, extent, 0.f);
     pipeline->bind(commandBuffer, imageIndex);
 
     for (WvkModel *model : models) {
@@ -363,11 +449,16 @@ void WvkApplication::loadModels() {
     WvkModel *model = new WvkModel(device, allVertices, allIndices);
     models.push_back(model);*/
 
-    //WvkModel *model = new WvkModel(device, "viking_room.obj.model");
-    //models.push_back(model);
-
-    WvkModel *model = new WvkModel(device, "cube.obj.model");
+    WvkModel *model = new WvkModel(device, "viking_room.obj.model");
     models.push_back(model);
+
+    /*WvkModel *cube = new WvkModel(device, "cube.obj.model");
+    models.push_back(cube);*/
+}
+
+bool WvkApplication::isKeyPressed(int key) {
+    int state = glfwGetKey(window.getGlfwWindow(), key);
+    return state == GLFW_PRESS;
 }
 
 }

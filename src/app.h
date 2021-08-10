@@ -31,6 +31,8 @@ class WvkApplication {
 
     void run();
 
+    bool isKeyPressed(int);
+
   private:
     void createPipelineResources();
     void createPipelines();
@@ -65,10 +67,18 @@ class WvkApplication {
 
     /* Pipeline descriptor set resources */
     Sampler textureSampler{device};
+    Sampler depthSampler{device};
 
-    const std::vector<std::string> images = {"viking_room.png", "hazel.png"};
+    const std::vector<std::string> images = {"hazel.png", "viking_room.png"};
     std::vector<Image> textureImages;
 
+    struct {
+        glm::vec3 position; // position in worldspace
+        glm::vec3 rotation; // components:  pitch, yaw, roll
+        glm::vec3 direction;
+
+        glm::vec2 mousePosition;
+    } camera;
     std::vector<Buffer> cameraTransformBuffers;
 };
 
