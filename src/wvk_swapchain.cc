@@ -412,7 +412,6 @@ void WvkSwapchain::createSynchronizationObjects() {
 uint32_t WvkSwapchain::acquireNextImage() {
     VkDevice dev = device.getDevice();
     VkSemaphore imageAvailableSemaphore = imageAvailableSemaphores[currentFrame];
-    VkSemaphore renderFinishedSemaphore = renderFinishedSemaphores[currentFrame];
     VkFence inFlightFence = inFlightFences[currentFrame];
 
     vkWaitForFences(dev, 1, &inFlightFence, VK_TRUE, UINT64_MAX);

@@ -36,6 +36,9 @@ class WvkApplication {
     glm::vec2 getCursorPos();
 
     void setCamera(Camera *camera) { this->camera = camera; }
+    void setLight(int light, TransformMatrices *transform);
+
+    uint64_t getFrame() { return frame; }
 
   private:
     void createPipelineResources();
@@ -48,7 +51,7 @@ class WvkApplication {
     void recordShadowRenderPass(int imageIndex);
     void recordMainRenderPass(int imageIndex);
 
-    void writeCameraTransform(VkExtent2D extent, VkDeviceMemory memory);
+    void writeTransform(TransformMatrices *transform, VkDeviceMemory memory);
 
     void loadModels();
     void imguiInit();
@@ -79,6 +82,7 @@ class WvkApplication {
     std::vector<Image> textureImages;
 
     std::vector<Buffer> cameraTransformBuffers;
+    std::vector<Buffer> lightTransformBuffers;
 };
 
 };
