@@ -19,14 +19,15 @@ namespace wvk {
 
 struct Vertex {
     glm::vec3 position;
+    glm::vec3 normal = {0,0,0};
     glm::vec2 tex_coord;
     uint8_t texture_index = 1;
 
     static VkVertexInputBindingDescription getBindingDescription();
-    static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions();
+    static std::array<VkVertexInputAttributeDescription, 4> getAttributeDescriptions();
 
     bool operator==(const Vertex& other) const {
-        return position == other.position && tex_coord == other.tex_coord;
+        return position == other.position && tex_coord == other.tex_coord && normal == other.normal && texture_index == other.texture_index;
     }
 };
 

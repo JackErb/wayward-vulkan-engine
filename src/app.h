@@ -12,13 +12,6 @@
 
 namespace wvk {
 
-struct CameraTransform {
-    glm::vec3 position;
-
-    glm::vec3 lookingAt;
-
-};
-
 class WvkApplication {
   public:
     static constexpr int WIDTH = 800;
@@ -37,8 +30,11 @@ class WvkApplication {
 
     void setCamera(Camera *camera) { this->camera = camera; }
     void setLight(int light, TransformMatrices *transform);
+    void addModel(WvkModel *model) { models.push_back(model); }
 
     uint64_t getFrame() { return frame; }
+
+    WvkDevice &getDevice() { return device; }
 
   private:
     void createPipelineResources();
@@ -52,9 +48,6 @@ class WvkApplication {
     void recordMainRenderPass(int imageIndex);
 
     void writeTransform(TransformMatrices *transform, VkDeviceMemory memory);
-
-    void loadModels();
-    void imguiInit();
 
     uint64_t frame = 0;
 

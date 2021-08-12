@@ -22,11 +22,6 @@ WvkApplication::WvkApplication() {
 
     createCommandBuffers();
     logger::debug("Created command buffers");
-
-    loadModels();
-    logger::debug("Load models");
-
-    imguiInit();
 }
 
 WvkApplication::~WvkApplication() {
@@ -64,31 +59,6 @@ void checkVkResult(VkResult err) {
     if (err != VK_SUCCESS) {
         logger::fatal_error("Imgui_ImplVulkan_Init call failed with error code: " + std::to_string(err));
     }
-}
-
-void WvkApplication::imguiInit() {
-    /*
-    // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-    //ImGui::StyleColorsClassic();
-
-    // Setup Platform/Renderer backends
-    ImGui_ImplGlfw_InitForVulkan(device.getWindow().getGlfwWindow(), true);
-
-    ImGui_ImplVulkan_InitInfo initInfo{};
-    init_info.Instance = device.getInstance();
-    init_info.PhysicalDevice = device.getPhysicalDevice();
-    init_info.Device = device.getDevice();
-    init_info.QueueFamily = device.getQueueIndices().graphicsQueue;
-    init_info.Queue = device.getGraphicsQueue();
-    init_info.PipelineCache = VK_NULL_HANDLE;
-    init_info.DescriptorPool = VK_NULL_HANDLE;
-    init_info.Allocator = nullptr;
-    init_info.MinImageCount = 2;
-    init_info.ImageCount = swapChain.getImageCount();
-    init_info.CheckVkResultFn = &checkVkResult;
-    ImGui_ImplVulkan_Init(&initInfo, wd->RenderPass);
-    */
 }
 
 std::chrono::time_point<std::chrono::high_resolution_clock> getTime() {
@@ -162,7 +132,7 @@ void WvkApplication::createPipelineResources() {
 void WvkApplication::createPipelines() {
     PipelineConfigInfo defaultConfig = WvkPipeline::defaultPipelineConfigInfo();
 
-    // Shadow mapping pipeline
+    /* Shadow mapping pipeline */
 
     DescriptorSetInfo shadowDescriptor{};
     auto &shadowLayout = shadowDescriptor.layoutBindings;
@@ -183,13 +153,15 @@ void WvkApplication::createPipelines() {
                                                    shadowDescriptor,
                                                    WvkPipeline::defaultPipelineConfigInfo());
 
-    // Main render pass pipeline
+
+    /* Main render pass pipeline */
 
     DescriptorSetInfo mainDescriptor{};
     auto &mainLayout = mainDescriptor.layoutBindings;
 
     mainLayout.resize(5);
 
+    /* Camera space projection */
     mainLayout[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     mainLayout[0].count = 1;
     mainLayout[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
@@ -199,6 +171,7 @@ void WvkApplication::createPipelines() {
         mainLayout[0].data[i][0].size = cameraTransformBuffers[i].size;
     }
 
+    /* Array of textures */
     mainLayout[1].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
     mainLayout[1].count = textureImages.size();
     mainLayout[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -208,12 +181,14 @@ void WvkApplication::createPipelines() {
         mainLayout[1].data[0][i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     }
 
+    /* Texture sampler */
     mainLayout[2].type = VK_DESCRIPTOR_TYPE_SAMPLER;
     mainLayout[2].count = 1;
     mainLayout[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     mainLayout[2].unique = false;
     mainLayout[2].data[0][0].sampler = textureSampler.sampler;
 
+    /* Light depth image */
     mainLayout[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     mainLayout[3].count = 1;
     mainLayout[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -222,9 +197,10 @@ void WvkApplication::createPipelines() {
     mainLayout[3].data[0][0].sampler = depthSampler.sampler;
     mainLayout[3].data[0][0].imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
+    /* Light space projection */
     mainLayout[4].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     mainLayout[4].count = 1;
-    mainLayout[4].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    mainLayout[4].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
     mainLayout[4].unique = true;
     for (size_t i = 0; i < swapChain.getImageCount(); i++) {
         mainLayout[4].data[i][0].buffer = lightTransformBuffers[i].buffer;
@@ -381,56 +357,6 @@ void WvkApplication::recordCommandBuffer(int imageIndex) {
     recordMainRenderPass(imageIndex);
 
     checkVulkanError(vkEndCommandBuffer(commandBuffer), "failed to record command buffer");
-}
-
-void WvkApplication::loadModels() {
-    /*std::vector<Vertex> vertices = {
-        {{-0.5f, -0.5, 1.f}, {0.f, 0.f}},
-        {{-0.5f, 0.5f, 1.f}, {0.f, 1.f}},
-        {{0.5f, 0.5f, 1.f}, {1.f, 1.f}},
-        {{0.5f, -0.5f, 1.f}, {1.f, 0.f}}
-    };
-
-    std::vector<Vertex> allVertices{};
-    std::vector<uint32_t> allIndices{};
-    for (int i = 0; i < 10; i++) {
-        vertices[0].position.z = 1.f - 0.1f * i;
-        vertices[1].position.z = 1.f - 0.1f * i;
-        vertices[2].position.z = 1.f - 0.1f * i;
-        vertices[3].position.z = 1.f - 0.1f * i;
-
-        allVertices.push_back(vertices[0]);
-        allVertices.push_back(vertices[1]);
-        allVertices.push_back(vertices[2]);
-        allVertices.push_back(vertices[3]);
-
-        uint32_t offset = i * 4;
-        std::vector<uint32_t> indices = {0 + offset, 1 + offset, 2 + offset, 2 + offset, 3 + offset, 0 + offset};
-        for (uint32_t index : indices) {
-            allIndices.push_back(index);
-        }
-    }
-
-    WvkModel *model = new WvkModel(device, allVertices, allIndices);
-    models.push_back(model);*/
-
-    std::vector<Vertex> vertices = {
-        {{-5.f, -5.f, -1.5f}, {0.f, 0.f}, 0},
-        {{-5.f, 5.f, -1.5f}, {0.f, 1.f}, 0},
-        {{5.f, 5.f, -1.5f}, {1.f, 1.f}, 0},
-        {{5.f, -5.f, -1.5f}, {1.f, 0.f}, 0}
-    };
-
-    std::vector<uint32_t> indices = {2, 1, 0, 0, 3, 2};
-
-    WvkModel *floor = new WvkModel(device, vertices, indices);
-    models.push_back(floor);
-
-    /*WvkModel *model = new WvkModel(device, "viking_room.obj.model");
-    models.push_back(model);*/
-
-    WvkModel *cube = new WvkModel(device, "cube.obj.model");
-    models.push_back(cube);
 }
 
 bool WvkApplication::isKeyPressed(int key) {

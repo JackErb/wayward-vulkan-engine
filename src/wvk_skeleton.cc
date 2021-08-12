@@ -5,7 +5,7 @@ namespace wvk {
 std::vector<Vertex> skeletonVertexToWvkVertex(const std::vector<SkeletonVertex> vertices) {
     std::vector<Vertex> converted;
     for (auto skeletonVertex : vertices) {
-        Vertex vertex{skeletonVertex.position, skeletonVertex.texCoord};
+        Vertex vertex{skeletonVertex.position, skeletonVertex.normal, skeletonVertex.texCoord};
         converted.push_back(vertex);
     }
     return converted;

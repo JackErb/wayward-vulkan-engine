@@ -14,10 +14,31 @@ DebugController::DebugController(wvk::WvkApplication *app) : app{app} {
     lightTransform.lookingTowards(glm::vec3(0.0f, 0.0f, 0.0f));
 
     app->setCamera(&camera);
+
+    loadModels();
 }
 
 DebugController::~DebugController() {
 
+}
+
+void DebugController::loadModels() {
+    std::vector<wvk::Vertex> vertices = {
+        {{-5.f, -5.f, -1.5f}, {0.f, 0.f, 1.f}, {0.f, 0.f}, 0},
+        {{-5.f, 5.f, -1.5f}, {0.f, 0.f, 1.f}, {0.f, 1.f}, 0},
+        {{5.f, 5.f, -1.5f}, {0.f, 0.f, 1.f}, {1.f, 1.f}, 0},
+        {{5.f, -5.f, -1.5f}, {0.f, 0.f, 1.f}, {1.f, 0.f}, 0}
+    };
+
+    std::vector<uint32_t> indices = {2, 1, 0, 0, 3, 2};
+
+    wvk::WvkDevice &device = app->getDevice();
+
+    wvk::WvkModel *floor = new wvk::WvkModel(device, vertices, indices);
+    app->addModel(floor);
+
+    wvk::WvkModel *viking_room = new wvk::WvkModel(device, "viking_room.obj.model");
+    app->addModel(viking_room);
 }
 
 void DebugController::update() {
