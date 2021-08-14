@@ -14,44 +14,59 @@ struct TransformMatrices {
 };
 
 struct Transform {
+    static constexpr float MIN_ROLL = glm::radians(-89.5);
+    static constexpr float MAX_ROLL = glm::radians(89.5);
+
     glm::vec3 position; // position in worldspace
     float yaw;
     float roll;
 
-    glm::vec3 direction() {
+    glm::mat4 rotationMatrix() {
         glm::mat4 rotationMatrix = glm::mat4(1.0f);
         rotationMatrix = glm::rotate(rotationMatrix, yaw, VECTOR_UP);
         rotationMatrix = glm::rotate(rotationMatrix, roll, VECTOR_RIGHT);
 
-        return rotationMatrix * glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
+        return rotationMatrix;
+    }
+
+    glm::vec3 direction() {
+        return rotationMatrix() * glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
     }
 
     // Returns angles between point and (1, 0)
-    static float getAngle(glm::vec2 a) {
-        static glm::vec2 b = glm::vec2(1.0f, 0.0f);
-        static float bdist = 1;
-
+    static float getAngle(glm::vec2 a, glm::vec2 b) {
+        //a = glm::normalize(a);
         float adist = a.x * a.x + a.y * a.y;
+        if (abs(adist) < 0.001) {
+            return 0.0;
+        }
+
+        //b = glm::normalize(b);
+        float bdist = b.x * b.x + b.y * b.y;
+        if (bdist == 0.0) {
+            return 0.0;
+        }
 
         float cx = b.x - a.x;
         float cy = b.y - a.y;
         float cdist = cx * cx + cy * cy;
 
+        // Law of cosines
         float theta = acos((adist + bdist - cdist) / (2 * sqrt(adist) * sqrt(bdist)));
         return a.y >= 0 ? theta : -theta;
     }
 
+    void capRoll() {
+        if (roll < MIN_ROLL) roll = MIN_ROLL;
+        if (roll > MAX_ROLL) roll = MAX_ROLL;
+    }
+
     void setDirection(glm::vec3 direction) {
-        yaw = getAngle(glm::vec2(direction.x, direction.y));
-        roll = getAngle(glm::vec2(-direction.x, direction.z));
+        float directionDist = sqrt(direction.x * direction.x + direction.y * direction.y);
 
-
-        glm::vec3 newd = this->direction();
-        logger::debug(std::to_string(direction.x) + " " + std::to_string(direction.y) + " " + std::to_string(direction.z));
-        logger::debug(std::to_string(newd.x) + " " + std::to_string(newd.y) + " " + std::to_string(newd.z));
-
-        logger::debug("Yaw: " + std::to_string(glm::degrees(yaw)));
-        logger::debug("Roll: " + std::to_string(glm::degrees(roll)));
+        yaw = getAngle(glm::vec2(direction.x, direction.y), glm::vec2(1, 0));
+        roll = getAngle(glm::vec2(directionDist, -direction.z), glm::vec2(1, 0));
+        capRoll();
     }
 
     void lookingTowards(glm::vec3 point) {
@@ -59,14 +74,24 @@ struct Transform {
     }
 
     TransformMatrices perspectiveProjection(float aspectRatio) {
-        static float fov = glm::radians(60.0f);
-        static float zNear = 0.1f;
-        static float zFar = 100.0f;
+        static float fov = glm::radians(60.0);
+        static float zNear = 0.1;
+        static float zFar = 100.0;
 
         TransformMatrices matrices{};
-        matrices.model = glm::mat4(1.0f);
+        matrices.model = glm::mat4(1.0);
         matrices.view = glm::lookAt(position, position + direction(), VECTOR_UP);
         matrices.projection = glm::perspective(fov, aspectRatio, zNear, zFar);
+        matrices.projection[1][1] *= -1;
+
+        return matrices;
+    }
+
+    TransformMatrices orthoProjection(float x1, float x2, float y1, float y2, float zNear, float zFar) {
+        TransformMatrices matrices{};
+        matrices.model = glm::mat4(1.0f);
+        matrices.view = glm::lookAt(position, position + direction(), VECTOR_RIGHT);
+        matrices.projection = glm::ortho(x1, x2, y1, y2, zNear, zFar);
         matrices.projection[1][1] *= -1;
 
         return matrices;

@@ -16,46 +16,60 @@ layout(location = 0) out vec4 outColor;
 
 const vec3 lightPos = vec3(1.0, 1.0, 1.0);
 const vec3 lightColor = vec3(1.0, 1.0, 1.0);
-const float lightPower = 50.0;
-const vec3 ambientColor = vec3(0.1, 0.12, 0.1);
-const vec3 diffuseColor = vec3(0.5, 0.0, 0.0);
+const vec3 diffuseColor = vec3(1.0, 1.0, 1.0);
 const vec3 specColor = vec3(1.0, 1.0, 1.0);
-const float shininess = 32.0;
-const float screenGamma = 2.2;
+const float shininess = 16.0;
 
 void main() {
+    /* === SHADOW CALCULATIONS === */
+
+    float shadow = 0.0;
+
+    vec3 projCoords = lightPosition.xyz / lightPosition.w;
+    vec2 depthTexCoords = projCoords.xy * 0.5 + 0.5;
+    if ( (depthTexCoords.x >= 0.0 && depthTexCoords.x <= 1.0) && (depthTexCoords.y >= 0.0 && depthTexCoords.y <= 1.0) )  {
+        vec4 depthColor = texture(depthSampler, depthTexCoords);
+        float lightDepth = depthColor.r;
+        float fragDepth = projCoords.z;
+
+        if (fragDepth - 0.01 > lightDepth) {
+            shadow = 1.0;
+        }
+    }
+
+
+    /* === LIGHTING CALCULATIONS === */
+
     vec4 textureColor = texture(sampler2D(textures[textureIndex], texSampler), texCoord);
 
     vec3 normal = normalize(vertNormal);
-    vec3 lightDir = lightPos - worldPosition;
+    vec3 lightDir = normalize(lightPos - worldPosition);
     float distance = length(lightDir);
     distance = distance * distance;
     lightDir = normalize(lightDir);
 
+    vec3 ambient = textureColor.rgb * 0.15;
+
     float lambertian = max(dot(lightDir, normal), 0.0);
-    float specular = 0.0;
 
+    vec3 diffuse = lambertian * lightColor;
+
+    vec3 specular = vec3(0.0);
     if (lambertian > 0.0) {
-
         vec3 viewDir = normalize(-worldPosition);
-
-        // this is blinn phong
         vec3 halfDir = normalize(lightDir + viewDir);
         float specAngle = max(dot(halfDir, normal), 0.0);
-        specular = pow(specAngle, shininess);
+        specular = pow(specAngle, shininess) * lightColor;
     }
 
-    vec3 colorLinear = ambientColor +
-                       diffuseColor * lambertian * lightColor * lightPower / distance +
-                       specColor * specular * lightColor * lightPower / distance;
+    vec3 lighting = (ambient + (1.0 - shadow) * (diffuse + specular)) * textureColor.rgb;
+    outColor = vec4(lighting, textureColor.a);
 
-    // apply gamma correction (assume ambientColor, diffuseColor and specColor
-    // have been linearized, i.e. have no gamma correction in them)
-    vec3 colorGammaCorrected = pow(colorLinear, vec3(1.0 / screenGamma));
-    // use the gamma corrected color in the fragment
-    outColor = textureColor * vec4(colorGammaCorrected, 1.0);
 
-    vec2 depthPosition = vec2(lightPosition.x, lightPosition.y);
-    vec4 depthColor = texture(depthSampler, depthPosition);
-    float lightDepth = depthColor.r;
+    /*
+    // Set texture to depth sampler
+    vec4 depthTexture = texture(depthSampler, texCoord);
+    float depth = depthTexture.r;
+    outColor = vec4(vec3(depth), 1.0);
+    */
 }

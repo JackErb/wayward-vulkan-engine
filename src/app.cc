@@ -90,6 +90,7 @@ void WvkApplication::run() {
         auto end = getTime();
         timeCount += duration_cast<microseconds>(end - start).count();
 
+        updateKeys();
         controller.update();
 
         if (++frame % FRAME_INTERVAL == 0) {
@@ -115,6 +116,10 @@ void WvkApplication::createPipelineResources() {
     // Allocate uniform buffers (one per swapchain image)
     VkDeviceSize bufferSize = sizeof(TransformMatrices);
     for (size_t i = 0; i < swapChain.getImageCount(); i++) {
+        // TODO: Look into using non-coherent memory and explicitly flush the the device memory
+        // to the GPU whenever updated. This can be more efficient, but not all systems will
+        // have this memory type available.
+
         cameraTransformBuffers.emplace_back();
         device.createBuffer(bufferSize,
                             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
@@ -149,7 +154,7 @@ void WvkApplication::createPipelines() {
     }
 
     shadowPipeline = std::make_unique<WvkPipeline>(device, swapChain, swapChain.getShadowRenderPass(),
-                                                   "shadow.vert.spv", "empty.frag.spv",
+                                                   "shadow.vert.spv", "",
                                                    shadowDescriptor,
                                                    WvkPipeline::defaultPipelineConfigInfo());
 
@@ -359,9 +364,49 @@ void WvkApplication::recordCommandBuffer(int imageIndex) {
     checkVulkanError(vkEndCommandBuffer(commandBuffer), "failed to record command buffer");
 }
 
+void WvkApplication::updateKeys() {
+    for (std::pair<uint16_t, KeyState> pair : keyStates) {
+        uint16_t key = pair.first;
+        KeyState state = pair.second;
+
+        int glfwState = glfwGetKey(window.getGlfwWindow(), key);
+
+        switch (state) {
+        case KEY_PRESSED:
+            keyStates[key] = KEY_HELD;
+        case KEY_HELD:
+            if (glfwState == GLFW_RELEASE) {
+                keyStates[key] = KEY_RELEASED;
+            }
+            break;
+        case KEY_RELEASED:
+            if (glfwState == GLFW_PRESS) {
+                keyStates[key] = KEY_PRESSED;
+            }
+            break;
+        }
+    }
+}
+
 bool WvkApplication::isKeyPressed(int key) {
-    int state = glfwGetKey(window.getGlfwWindow(), key);
-    return state == GLFW_PRESS;
+    if (keyStates.find(key) == keyStates.end()) {
+        keyStates[key] = KEY_RELEASED;
+    }
+    return keyStates[key] == KEY_PRESSED;
+}
+
+bool WvkApplication::isKeyHeld(int key) {
+    if (keyStates.find(key) == keyStates.end()) {
+        keyStates[key] = KEY_RELEASED;
+    }
+    return keyStates[key] == KEY_HELD || keyStates[key] == KEY_PRESSED;
+}
+
+bool WvkApplication::isKeyReleased(int key) {
+    if (keyStates.find(key) == keyStates.end()) {
+        keyStates[key] = KEY_RELEASED;
+    }
+    return keyStates[key] == KEY_RELEASED;
 }
 
 glm::vec2 WvkApplication::getCursorPos() {
@@ -372,7 +417,7 @@ glm::vec2 WvkApplication::getCursorPos() {
 }
 
 void WvkApplication::setLight(int light, TransformMatrices *transform) {
-    // TODO: param light index is currently unussed
+    // TODO: param light index is currently unused
 
     for (size_t i = 0; i < lightTransformBuffers.size(); i++) {
         writeTransform(transform, lightTransformBuffers[i].memory);

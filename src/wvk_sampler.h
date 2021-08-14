@@ -8,7 +8,7 @@
 namespace wvk {
 
 struct Sampler {
-    Sampler(WvkDevice &device);
+    Sampler(WvkDevice &device, VkSamplerAddressMode addressMode);
     void cleanup();
 
     VkSampler sampler;

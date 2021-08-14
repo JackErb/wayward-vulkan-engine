@@ -22,6 +22,11 @@ WvkWindow::~WvkWindow() {
     glfwTerminate();
 }
 
+bool WvkWindow::cursorEnabled() {
+    int mode = glfwGetInputMode(window, GLFW_CURSOR);
+    return mode == GLFW_CURSOR_NORMAL;
+}
+
 void WvkWindow::enableCursor(bool enabled) {
     if (enabled) {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);

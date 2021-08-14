@@ -9,8 +9,20 @@
 #include "game/game_structs.h"
 
 #include <vector>
+#include <unordered_map>
 
 namespace wvk {
+
+enum KeyState {
+    KEY_PRESSED,
+    KEY_HELD,
+    KEY_RELEASED,
+};
+
+enum CursorState {
+    CURSOR_ENABLED,
+    CURSOR_DISABLED
+};
 
 class WvkApplication {
   public:
@@ -26,7 +38,12 @@ class WvkApplication {
     void run();
 
     bool isKeyPressed(int);
+    bool isKeyHeld(int);
+    bool isKeyReleased(int);
+
     glm::vec2 getCursorPos();
+    bool cursorEnabled() { return window.cursorEnabled(); }
+    void enableCursor(bool enable) { window.enableCursor(enable); }
 
     void setCamera(Camera *camera) { this->camera = camera; }
     void setLight(int light, TransformMatrices *transform);
@@ -49,6 +66,8 @@ class WvkApplication {
 
     void writeTransform(TransformMatrices *transform, VkDeviceMemory memory);
 
+    void updateKeys();
+
     uint64_t frame = 0;
 
     WvkWindow window{WIDTH, HEIGHT, "Hello Vulkan!"};
@@ -68,14 +87,16 @@ class WvkApplication {
     std::vector<VkCommandBuffer> commandBuffers;
 
     /* Pipeline descriptor set resources */
-    Sampler textureSampler{device};
-    Sampler depthSampler{device};
+    Sampler textureSampler{device, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER};
+    Sampler depthSampler{device, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER};
 
     const std::vector<std::string> images = {"hazel.png", "viking_room.png"};
     std::vector<Image> textureImages;
 
     std::vector<Buffer> cameraTransformBuffers;
     std::vector<Buffer> lightTransformBuffers;
+
+    std::unordered_map<uint16_t, KeyState> keyStates;
 };
 
 };
