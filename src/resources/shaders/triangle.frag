@@ -33,10 +33,13 @@ void main() {
         float fragDepth = projCoords.z;
 
         if (fragDepth - 0.01 > lightDepth) {
+            // We are in shadow
             shadow = 1.0;
         }
+    } else {
+        // Tex coordinates are outside outside of depth map. Assume we are not in shadow
+        shadow = 0.0;
     }
-
 
     /* === LIGHTING CALCULATIONS === */
 

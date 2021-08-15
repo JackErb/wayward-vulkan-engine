@@ -1,5 +1,7 @@
 #pragma once
 
+#include "wvk_device.h"
+
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -31,13 +33,14 @@ class WvkSwapchain {
     VkFramebuffer getShadowFramebuffer() { return shadowFramebuffer; }
     VkExtent2D getExtent() { return swapChainExtent; }
     uint32_t getImageCount() { return images.size(); }
-    VkImageView getShadowImageView() { return shadowImageView; }
     VkImageView getShadowDepthImageView() { return shadowDepthImageView; }
 
     uint32_t acquireNextImage();
     void submitCommands(VkCommandBuffer buffer, uint32_t imageIndex);
 
   private:
+    void cacheDeviceProperties();
+
     void createSwapchain();
 
     void createSwapchainImages();
@@ -55,9 +58,11 @@ class WvkSwapchain {
 
     VkSwapchainKHR swapChain;
 
+    // Device & presentation information
     VkFormat imageFormat;
     VkExtent2D swapChainExtent;
     VkExtent2D windowExtent;
+    VkSampleCountFlagBits samples;
 
     std::vector<VkImage> images;
     std::vector<VkImageView> imageViews;
@@ -69,9 +74,13 @@ class WvkSwapchain {
     // TODO: Choose this dynamically based on supported formats of physical device (vkGetPhysicalDeviceFormatProperties)
     const static VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
 
-    VkImage depthImage;
-    VkDeviceMemory depthImageMemory;
-    VkImageView depthImageView;
+    VkImage colorImage;
+    VkDeviceMemory colorImageMemory;
+    VkImageView colorImageView;
+
+    VkImage colorDepthImage;
+    VkDeviceMemory colorDepthImageMemory;
+    VkImageView colorDepthImageView;
 
     VkImage shadowImage;
     VkDeviceMemory shadowImageMemory;

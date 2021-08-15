@@ -4,6 +4,7 @@
 #include "wvk_image.h"
 #include "wvk_buffer.h"
 #include "game/game_structs.h"
+#include "wvk_swapchain.h"
 
 #include "glm.h"
 
@@ -75,7 +76,7 @@ class WvkPipeline {
     WvkPipeline(const WvkPipeline&) = delete;
     WvkPipeline& operator=(const WvkPipeline&) = delete;
 
-    static PipelineConfigInfo defaultPipelineConfigInfo();
+    static PipelineConfigInfo defaultPipelineConfigInfo(VkSampleCountFlagBits samples);
 
     void updateUniformBuffer(int imageIndex, TransformMatrices ubo);
     void bind(VkCommandBuffer commandBuffer, int imageIndex);

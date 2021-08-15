@@ -135,8 +135,6 @@ void WvkApplication::createPipelineResources() {
 }
 
 void WvkApplication::createPipelines() {
-    PipelineConfigInfo defaultConfig = WvkPipeline::defaultPipelineConfigInfo();
-
     /* Shadow mapping pipeline */
 
     DescriptorSetInfo shadowDescriptor{};
@@ -156,7 +154,7 @@ void WvkApplication::createPipelines() {
     shadowPipeline = std::make_unique<WvkPipeline>(device, swapChain, swapChain.getShadowRenderPass(),
                                                    "shadow.vert.spv", "",
                                                    shadowDescriptor,
-                                                   WvkPipeline::defaultPipelineConfigInfo());
+                                                   WvkPipeline::defaultPipelineConfigInfo(VK_SAMPLE_COUNT_1_BIT));
 
 
     /* Main render pass pipeline */
@@ -215,7 +213,7 @@ void WvkApplication::createPipelines() {
     pipeline = std::make_unique<WvkPipeline>(device, swapChain, swapChain.getRenderPass(),
                                              "triangle.vert.spv", "triangle.frag.spv",
                                              mainDescriptor,
-                                             WvkPipeline::defaultPipelineConfigInfo());
+                                             WvkPipeline::defaultPipelineConfigInfo(VK_SAMPLE_COUNT_4_BIT));
 }
 
 void WvkApplication::createCommandBuffers() {

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "wvk_window.h"
-#include "wvk_swapchain.h"
 #include "wvk_buffer.h"
 
 #include <logger.h>
@@ -16,6 +15,12 @@ namespace wvk {
 struct QueueIndices {
    uint32_t graphicsQueue;
    uint32_t presentQueue;
+};
+
+struct PhysicalDeviceProperties {
+    VkPhysicalDeviceProperties vk;
+
+    VkSampleCountFlagBits maxSampleCount;
 };
 
 class WvkDevice {
@@ -48,7 +53,7 @@ class WvkDevice {
     VkPhysicalDevice getPhysicalDevice() { return physicalDevice; }
     VkDevice getDevice() { return device; }
     VkCommandPool getCommandPool() { return commandPool; }
-    VkPhysicalDeviceProperties getPhysicalDeviceProprties() { return physicalDeviceProperties; }
+    PhysicalDeviceProperties getPhysicalDeviceProperties() { return physicalDeviceProperties; }
 
     QueueIndices getQueueIndices() { return queueIndices; }
     VkQueue getGraphicsQueue() { return graphicsQueue; }
@@ -62,8 +67,10 @@ class WvkDevice {
 
     void createImage(uint32_t width,          uint32_t height,
                      VkFormat format,         VkImageTiling tiling,
+                     VkSampleCountFlagBits samples,
                      VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
                      VkImage &image,          VkDeviceMemory &imageMemory);
+
     VkImageView createImageView(VkImage image, VkFormat format,
                                 VkImageAspectFlags aspectFlags);
 
@@ -82,6 +89,8 @@ class WvkDevice {
     void createLogicalDevice();
     void createCommandPool();
 
+    void cachePhysicalDeviceProperties();
+
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
     // Helper functions
@@ -98,7 +107,7 @@ class WvkDevice {
     VkQueue presentQueue;
     QueueIndices queueIndices;
 
-    VkPhysicalDeviceProperties physicalDeviceProperties;
+    PhysicalDeviceProperties physicalDeviceProperties;
 };
 
 };

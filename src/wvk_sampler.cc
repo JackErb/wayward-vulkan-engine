@@ -15,7 +15,7 @@ Sampler::Sampler(WvkDevice &wvkDevice, VkSamplerAddressMode addressMode) : devic
     samplerInfo.addressModeV = addressMode;
     samplerInfo.addressModeW = addressMode;
     samplerInfo.anisotropyEnable = VK_TRUE;
-    samplerInfo.maxAnisotropy = wvkDevice.getPhysicalDeviceProprties().limits.maxSamplerAnisotropy;
+    samplerInfo.maxAnisotropy = wvkDevice.getPhysicalDeviceProperties().vk.limits.maxSamplerAnisotropy;
     samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
     samplerInfo.unnormalizedCoordinates = VK_FALSE;
     samplerInfo.compareEnable = VK_FALSE;

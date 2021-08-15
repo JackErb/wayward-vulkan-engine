@@ -211,8 +211,22 @@ void WvkDevice::pickPhysicalDevice() {
         logger::fatal_error("failed to find suitable physical device");
     } else {
         // Cache some information about the physical device
-        vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
+        cachePhysicalDeviceProperties();
     }
+}
+
+void WvkDevice::cachePhysicalDeviceProperties() {
+    vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties.vk);
+
+    VkSampleCountFlags counts = physicalDeviceProperties.vk.limits.framebufferColorSampleCounts &
+                                physicalDeviceProperties.vk.limits.framebufferDepthSampleCounts;
+    if (counts & VK_SAMPLE_COUNT_64_BIT) { physicalDeviceProperties.maxSampleCount = VK_SAMPLE_COUNT_64_BIT; }
+    else if (counts & VK_SAMPLE_COUNT_32_BIT) { physicalDeviceProperties.maxSampleCount = VK_SAMPLE_COUNT_32_BIT; }
+    else if (counts & VK_SAMPLE_COUNT_16_BIT) { physicalDeviceProperties.maxSampleCount = VK_SAMPLE_COUNT_16_BIT; }
+    else if (counts & VK_SAMPLE_COUNT_8_BIT) { physicalDeviceProperties.maxSampleCount = VK_SAMPLE_COUNT_8_BIT; }
+    else if (counts & VK_SAMPLE_COUNT_4_BIT) { physicalDeviceProperties.maxSampleCount = VK_SAMPLE_COUNT_4_BIT; }
+    else if (counts & VK_SAMPLE_COUNT_2_BIT) { physicalDeviceProperties.maxSampleCount = VK_SAMPLE_COUNT_2_BIT; }
+    else { physicalDeviceProperties.maxSampleCount = VK_SAMPLE_COUNT_1_BIT; }
 }
 
 /* Creating the logical device */
@@ -307,8 +321,10 @@ void WvkDevice::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemo
 }
 
 void WvkDevice::createImage(uint32_t width, uint32_t height,
-                      VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
-                      VkImage &image, VkDeviceMemory &imageMemory) {
+                            VkFormat format, VkImageTiling tiling,
+                            VkSampleCountFlagBits samples,
+                            VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
+                            VkImage &image, VkDeviceMemory &imageMemory) {
     // Create VkImage
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -320,7 +336,7 @@ void WvkDevice::createImage(uint32_t width, uint32_t height,
     imageInfo.extent.depth = 1;
     imageInfo.mipLevels = 1;
     imageInfo.arrayLayers = 1;
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.samples = samples;
     imageInfo.tiling = tiling;
     imageInfo.usage = usage;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;

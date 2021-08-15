@@ -15,8 +15,8 @@ DebugController::DebugController(wvk::WvkApplication *app) : app{app} {
 
 
     /* Set up lights */
-    float shadowMapWidth = 4.0;
-    float shadowMapHeight = 4.0;
+    float shadowMapWidth = 2.5;
+    float shadowMapHeight = 2.5;
     float zNear = 0.1;
     float zFar = 10.0;
 
