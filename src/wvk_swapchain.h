@@ -1,6 +1,7 @@
 #pragma once
 
 #include "wvk_device.h"
+#include "wvk_renderpass.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -27,13 +28,20 @@ class WvkSwapchain {
     WvkSwapchain(const WvkSwapchain &) = delete;
     void operator=(const WvkSwapchain &) = delete;
 
-    VkRenderPass getRenderPass() { return renderPass; }
-    VkRenderPass getShadowRenderPass() { return shadowRenderPass; }
-    VkFramebuffer getFramebuffer(size_t imageIndex) { return framebuffers[imageIndex]; }
-    VkFramebuffer getShadowFramebuffer() { return shadowFramebuffer; }
+    VkRenderPass getRenderPass() { return mainRenderPass.getRenderPass(); }
+    VkRenderPass getShadowRenderPass() { return shadowRenderPass.getRenderPass(); }
+    VkFramebuffer getFramebuffer(size_t imageIndex) { return mainRenderPass.getFramebuffer(imageIndex); }
+    
+    VkFramebuffer getShadowFramebuffer() { return shadowRenderPass.getFramebuffer(); }
+    VkImageView getShadowDepthImageView() { return shadowDepthAttachment.view; }
+    
     VkExtent2D getExtent() { return swapChainExtent; }
     uint32_t getImageCount() { return images.size(); }
-    VkImageView getShadowDepthImageView() { return shadowDepthImageView; }
+    VkFormat getColorFormat() { return imageFormat; }
+    VkFormat getDepthFormat() {
+        // TODO: Choose this dynamically based on supported formats of physical device (vkGetPhysicalDeviceFormatProperties)
+        return VK_FORMAT_D32_SFLOAT;
+    }
 
     uint32_t acquireNextImage();
     void submitCommands(VkCommandBuffer buffer, uint32_t imageIndex);
@@ -42,14 +50,8 @@ class WvkSwapchain {
     void cacheDeviceProperties();
 
     void createSwapchain();
-
     void createSwapchainImages();
-    void createDepthResources();
-    void createSwapchainFramebuffers();
-
-    void createShadowRenderPass();
-    void createRenderPass();
-
+    void createRenderPasses();
     void createSynchronizationObjects();
 
 
@@ -64,32 +66,15 @@ class WvkSwapchain {
     VkExtent2D windowExtent;
     VkSampleCountFlagBits samples;
 
+    // Images belonging to the swapchain frame buffers
     std::vector<VkImage> images;
     std::vector<VkImageView> imageViews;
     std::vector<VkFramebuffer> framebuffers;
 
-    VkRenderPass shadowRenderPass;
-    VkRenderPass renderPass;
+    WvkRenderPass mainRenderPass;
+    WvkRenderPass shadowRenderPass;
 
-    // TODO: Choose this dynamically based on supported formats of physical device (vkGetPhysicalDeviceFormatProperties)
-    const static VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
-
-    VkImage colorImage;
-    VkDeviceMemory colorImageMemory;
-    VkImageView colorImageView;
-
-    VkImage colorDepthImage;
-    VkDeviceMemory colorDepthImageMemory;
-    VkImageView colorDepthImageView;
-
-    VkImage shadowImage;
-    VkDeviceMemory shadowImageMemory;
-    VkImageView shadowImageView;
-
-    VkImage shadowDepthImage;
-    VkDeviceMemory shadowDepthImageMemory;
-    VkImageView shadowDepthImageView;
-    VkFramebuffer shadowFramebuffer;
+    Attachment shadowDepthAttachment;
 
     WvkDevice &device;
 

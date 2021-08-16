@@ -16,7 +16,7 @@ set(ENV{VK_LAYER_PATH} $ENV{VULKAN_SDK}/share/explicit_layer.d)
 set(SOURCE_FILES main.cc app.h app.cc wvk_window.h wvk_window.cc wvk_device.h wvk_device.cc wvk_helper.h
                  wvk_pipeline.h wvk_pipeline.cc wvk_swapchain.h wvk_swapchain.cc resource_path.h resource_path.cc
                  wvk_image.h wvk_image.cc wvk_model.h wvk_model.cc glm.h wvk_buffer.h  wvk_skeleton.h wvk_skeleton.cc
-                 wvk_sampler.h wvk_sampler.cc
+                 wvk_sampler.h wvk_sampler.cc wvk_renderpass.h wvk_renderpass.cc
                  anim/skeleton.h anim/skeleton.cc anim/accessor_parser.cc)
 file(GLOB_RECURSE RES_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/resources/*")
 
