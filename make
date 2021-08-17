@@ -1,5 +1,5 @@
 cd build
-rm -r WaywrdVK.app
+rm -r WaywardVK.app
 python3 ../compile_shaders.py
 make
 

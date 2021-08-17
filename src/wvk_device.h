@@ -84,12 +84,14 @@ class WvkDevice {
 
   private:
     void createInstance();
+    void setupDebugCallbacks();
     void createSurface();
     void pickPhysicalDevice();
     void createLogicalDevice();
     void createCommandPool();
 
     void cachePhysicalDeviceProperties();
+    std::vector<const char*> getRequiredInstanceExtensions();
 
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
@@ -102,6 +104,8 @@ class WvkDevice {
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
     VkDevice device;
     VkCommandPool commandPool;
+
+    VkDebugUtilsMessengerEXT debugMessenger;
 
     VkQueue graphicsQueue;
     VkQueue presentQueue;

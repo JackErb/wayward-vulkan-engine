@@ -51,6 +51,7 @@ std::vector<Attachment> WvkRenderPass::createResources(const RenderPassInfo &pas
     for (const ImageInfo &imageInfo : passInfo.images) {
         if (!imageInfo.createImage) {
             attachments.push_back({VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE});
+            continue;
         }
 
         VkFormat imageFormat;

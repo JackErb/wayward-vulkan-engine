@@ -22,6 +22,8 @@ namespace wvk {
 WvkDevice::WvkDevice(WvkWindow &window) : window{window} {
     createInstance();
     logger::debug("Created instance");
+    setupDebugCallbacks();
+    logger::debug("Setup debug callbacks");
     window.createWindowSurface(instance, &surface);
     logger::debug("Created surface");
     pickPhysicalDevice();
@@ -33,6 +35,13 @@ WvkDevice::WvkDevice(WvkWindow &window) : window{window} {
 }
 
 WvkDevice::~WvkDevice() {
+    if (enableValidationLayers) {
+        auto func = (PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+        if (func != nullptr) {
+            func(instance, debugMessenger, nullptr);
+        }
+    }
+
     vkDestroyCommandPool(device, commandPool, nullptr);
     vkDestroyDevice(device, nullptr);
     vkDestroySurfaceKHR(instance, surface, nullptr);
@@ -64,7 +73,7 @@ bool checkValidationLayerSupport() {
     return hasValidationLayers;
 }
 
-std::vector<const char*> getRequiredInstanceExtensions() {
+std::vector<const char*> WvkDevice::getRequiredInstanceExtensions() {
     std::vector<const char*> extensions;
 
     // Get required glfw extensions
@@ -79,6 +88,10 @@ std::vector<const char*> getRequiredInstanceExtensions() {
 
     // TODO: This should only be included if VK_KHR_portability_subset is a required device extension
     extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+
+    if (enableValidationLayers) {
+        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    }
 
     return extensions;
 }
@@ -113,6 +126,38 @@ void WvkDevice::createInstance() {
 
     auto result = vkCreateInstance(&createInfo, nullptr, &instance);
     checkVulkanError(result, "failed to create vulkan instance");
+}
+
+static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageType,
+    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* pUserData) {
+
+    if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+        // Message is important enough to show
+        logger::debug(pCallbackData->pMessage);
+        logger::debug("Severity: " + std::to_string(messageSeverity));
+    }
+
+    return VK_FALSE;
+}
+
+void WvkDevice::setupDebugCallbacks() {
+    VkDebugUtilsMessengerCreateInfoEXT createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    createInfo.pfnUserCallback = debugCallback;
+    createInfo.pUserData = nullptr; // Optional
+
+    auto func = (PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+    if (func != nullptr) {
+        VkResult result = func(instance, &createInfo, nullptr, &debugMessenger);
+        checkVulkanError(result, "Failed to setup debug callbacks");
+    } else {
+        logger::fatal_error("vkCreateDebugUtilsMessengerEXT function was not found");
+    }
 }
 
 /* Picking the physical device */

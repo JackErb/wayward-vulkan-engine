@@ -21,7 +21,7 @@ WvkSwapchain::WvkSwapchain(WvkDevice &device, VkExtent2D extent) : device{device
 
     createRenderPasses();
     logger::debug("Created render passes");
-    
+
     createSynchronizationObjects();
     logger::debug("Created swap chain semaphores & fences");
 }
@@ -192,19 +192,21 @@ void WvkSwapchain::createRenderPasses() {
 
     ImageInfo shadowDepth{};
     shadowDepth.type = IMAGE_DEPTH;
+    shadowDepth.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     shadowDepth.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    shadowDepth.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     shadowDepth.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
     shadowDepth.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
 
     RenderPassInfo shadowPassInfo{};
-    shadowPassInfo.images = {shadowDepth};
-    shadowPassInfo.subpass.colorIndex = -1;
-    shadowPassInfo.subpass.depthIndex = 0;
+    shadowPassInfo.images = {shadowColor, shadowDepth};
+    shadowPassInfo.subpass.colorIndex = 0;
+    shadowPassInfo.subpass.depthIndex = 1;
 
     auto attachments = shadowRenderPass.initRenderPass(shadowPassInfo);
-    shadowRenderPass.createFramebuffer({attachments[0].view});//, attachments[1].view});
+    shadowRenderPass.createFramebuffer({attachments[0].view, attachments[1].view});
 
-    shadowDepthAttachment = attachments[0];
+    shadowDepthAttachment = attachments[1];
 
     logger::debug("Created shadow render pass");
 
@@ -213,7 +215,7 @@ void WvkSwapchain::createRenderPasses() {
     mainColor.type = IMAGE_COLOR;
     mainColor.samples = samples;
     mainColor.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    
+
     ImageInfo mainDepth{};
     mainDepth.type = IMAGE_DEPTH;
     mainDepth.samples = samples;
