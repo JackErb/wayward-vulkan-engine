@@ -187,9 +187,6 @@ void WvkSwapchain::createSwapchainImages() {
 
 void WvkSwapchain::createRenderPasses() {
     // Shadow render pass
-    ImageInfo shadowColor{};
-    shadowColor.type = IMAGE_COLOR;
-
     ImageInfo shadowDepth{};
     shadowDepth.type = IMAGE_DEPTH;
     shadowDepth.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -199,14 +196,13 @@ void WvkSwapchain::createRenderPasses() {
     shadowDepth.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
 
     RenderPassInfo shadowPassInfo{};
-    shadowPassInfo.images = {shadowColor, shadowDepth};
-    shadowPassInfo.subpass.colorIndex = 0;
-    shadowPassInfo.subpass.depthIndex = 1;
+    shadowPassInfo.images = {shadowDepth};
+    shadowPassInfo.subpass.depthIndex = 0;
 
     auto attachments = shadowRenderPass.initRenderPass(shadowPassInfo);
-    shadowRenderPass.createFramebuffer({attachments[0].view, attachments[1].view});
+    shadowRenderPass.createFramebuffer({attachments[0].view});
 
-    shadowDepthAttachment = attachments[1];
+    shadowDepthAttachment = attachments[0];
 
     logger::debug("Created shadow render pass");
 
