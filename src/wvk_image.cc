@@ -13,7 +13,7 @@ Image::Image(WvkDevice& wvkDevice, std::string filename) : device{wvkDevice.getD
 
     stbi_uc* pixels = stbi_load(imagePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
     if (!pixels) {
-        logger::fatal_error("failed to load image file");
+        logger::fatal_error("failed to load image file. path: " + imagePath);
     }
 
     this->width = static_cast<uint32_t>(texWidth);
@@ -32,7 +32,6 @@ Image::Image(WvkDevice& wvkDevice, std::string filename) : device{wvkDevice.getD
     vkMapMemory(device, stagingBuffer.memory, 0, imageSize, 0, &pData);
     memcpy(pData, pixels, static_cast<uint32_t>(imageSize));
     vkUnmapMemory(device, stagingBuffer.memory);
-    logger::debug("Mapped memory");
 
     // Create the image & image view
     wvkDevice.createImage(width, height,

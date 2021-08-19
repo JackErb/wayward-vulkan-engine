@@ -88,14 +88,11 @@ PipelineConfigInfo WvkPipeline::defaultPipelineConfigInfo(VkSampleCountFlagBits 
     configInfo.inputAssemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     configInfo.inputAssemblyInfo.primitiveRestartEnable = VK_FALSE;
 
-    VkViewport viewport{};
-    VkRect2D scissor{};
-
     configInfo.viewportInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    configInfo.viewportInfo.viewportCount = 1;
-    configInfo.viewportInfo.pViewports = &viewport;
-    configInfo.viewportInfo.scissorCount = 1;
-    configInfo.viewportInfo.pScissors = &scissor;
+    configInfo.viewportInfo.viewportCount = 0;
+    configInfo.viewportInfo.pViewports = nullptr;
+    configInfo.viewportInfo.scissorCount = 0;
+    configInfo.viewportInfo.pScissors = nullptr;
 
     configInfo.rasterizationInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     configInfo.rasterizationInfo.depthClampEnable = VK_FALSE;
@@ -131,8 +128,8 @@ PipelineConfigInfo WvkPipeline::defaultPipelineConfigInfo(VkSampleCountFlagBits 
     configInfo.colorBlendInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     configInfo.colorBlendInfo.logicOpEnable = VK_FALSE;
     configInfo.colorBlendInfo.logicOp = VK_LOGIC_OP_COPY;  // Optional
-    configInfo.colorBlendInfo.attachmentCount = 1;
-    configInfo.colorBlendInfo.pAttachments = &configInfo.colorBlendAttachment;
+    //configInfo.colorBlendInfo.attachmentCount = 1;
+    //configInfo.colorBlendInfo.pAttachments = &configInfo.colorBlendAttachment;
     configInfo.colorBlendInfo.blendConstants[0] = 0.0f;  // Optional
     configInfo.colorBlendInfo.blendConstants[1] = 0.0f;  // Optional
     configInfo.colorBlendInfo.blendConstants[2] = 0.0f;  // Optional
@@ -151,9 +148,9 @@ PipelineConfigInfo WvkPipeline::defaultPipelineConfigInfo(VkSampleCountFlagBits 
 
     configInfo.dynamicStateEnables = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
     configInfo.dynamicStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    configInfo.dynamicStateInfo.pDynamicStates = configInfo.dynamicStateEnables.data();
-    configInfo.dynamicStateInfo.dynamicStateCount =
-      static_cast<uint32_t>(configInfo.dynamicStateEnables.size());
+    //configInfo.dynamicStateInfo.pDynamicStates = configInfo.dynamicStateEnables.data();
+    //configInfo.dynamicStateInfo.dynamicStateCount =
+    //  static_cast<uint32_t>(configInfo.dynamicStateEnables.size());
     configInfo.dynamicStateInfo.flags = 0;
 
     return configInfo;
@@ -230,6 +227,13 @@ void WvkPipeline::createGraphicsPipeline(std::string vertShader, std::string fra
     pipelineConfig = config;
 
     /* Create the graphics pipeline */
+
+    pipelineConfig.colorBlendInfo.attachmentCount = 1;
+    pipelineConfig.colorBlendInfo.pAttachments = &pipelineConfig.colorBlendAttachment;
+
+    pipelineConfig.dynamicStateInfo.dynamicStateCount = static_cast<uint32_t>(pipelineConfig.dynamicStateEnables.size());
+    pipelineConfig.dynamicStateInfo.pDynamicStates = pipelineConfig.dynamicStateEnables.data();
+
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipelineInfo.stageCount          = static_cast<uint32_t>(shaderStages.size());
