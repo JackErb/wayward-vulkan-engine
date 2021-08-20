@@ -208,7 +208,7 @@ void WvkApplication::createPipelines() {
     }
 
     pipeline = std::make_unique<WvkPipeline>(device, swapChain, swapChain.getRenderPass(),
-                                             "triangle.vert.spv", "triangle.frag.spv",
+                                             "mesh.vert.spv", "basic.frag.spv",
                                              mainDescriptor,
                                              WvkPipeline::defaultPipelineConfigInfo(VK_SAMPLE_COUNT_4_BIT));
 }

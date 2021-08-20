@@ -8,7 +8,6 @@ static glm::vec3    VECTOR_UP = glm::vec3(0.0f, 0.0f, 1.0f);
 static glm::vec3 VECTOR_RIGHT = glm::vec3(0.0f, 1.0f, 0.0f);
 
 struct TransformMatrices {
-    glm::mat4 model;
     glm::mat4 view;
     glm::mat4 projection;
 };
@@ -79,7 +78,6 @@ struct Transform {
         static float zFar = 100.0;
 
         TransformMatrices matrices{};
-        matrices.model = glm::mat4(1.0);
         matrices.view = glm::lookAt(position, position + direction(), VECTOR_UP);
         matrices.projection = glm::perspective(fov, aspectRatio, zNear, zFar);
         matrices.projection[1][1] *= -1;
@@ -89,7 +87,6 @@ struct Transform {
 
     TransformMatrices orthoProjection(float x1, float x2, float y1, float y2, float zNear, float zFar) {
         TransformMatrices matrices{};
-        matrices.model = glm::mat4(1.0f);
         matrices.view = glm::lookAt(position, position + direction(), VECTOR_RIGHT);
         matrices.projection = glm::ortho(x1, x2, y1, y2, zNear, zFar);
         matrices.projection[1][1] *= -1;

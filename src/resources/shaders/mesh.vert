@@ -3,13 +3,11 @@
 #define MAX_OBJECTS 32
 
 layout(binding = 0) uniform CameraTransform {
-    mat4 model;
     mat4 view;
     mat4 proj;
 } camera;
 
 layout(binding = 4) uniform LightTransform {
-    mat4 model;
     mat4 view;
     mat4 proj;
 } light;
@@ -27,13 +25,13 @@ layout(location = 4) out vec3 fragWorldPosition;
 
 void main() {
     vec3 position = inPosition;
-    gl_Position = camera.proj * camera.view * camera.model * vec4(position, 1.0);
+    gl_Position = camera.proj * camera.view * vec4(position, 1.0);
 
     fragTexCoord = inTexCoord;
     fragTextureIndex = inTextureIndex;
     fragNormal = inNormal;
-    lightPosition = light.proj * light.view * light.model * vec4(position, 1.0);
+    lightPosition = light.proj * light.view * vec4(position, 1.0);
 
-    vec4 modelPosition = camera.model * vec4(position, 1.0);
+    vec4 modelPosition = vec4(position, 1.0);
     fragWorldPosition = vec3(modelPosition) / modelPosition.w;
 }

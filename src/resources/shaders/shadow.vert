@@ -1,7 +1,6 @@
 #version 450
 
 layout(binding = 0) uniform UniformBufferObject {
-    mat4 model;
     mat4 view;
     mat4 proj;
 } ubo;
@@ -13,5 +12,5 @@ layout(location = 3) in uint inTextureIndex;
 
 void main() {
     vec3 position = inPosition;
-    gl_Position = ubo.proj * ubo.view * ubo.model * vec4(position, 1.0);
+    gl_Position = ubo.proj * ubo.view * vec4(position, 1.0);
 }

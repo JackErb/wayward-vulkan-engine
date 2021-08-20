@@ -46,14 +46,11 @@ elseif (WIN32)
 
     set(OPTIMIZATION_FLAG "-Od")
 endif()
-#set(IMGUI "${PROJECT_SRC}lib/imgui/")
-#add_library(imgui STATIC "${IMGUI}imgui.cpp" "${IMGUI}imgui_demo.cpp" "${IMGUI}imgui_draw.cpp" "${IMGUI}imgui_tables.cpp"
-#                         "${IMGUI}imgui_impl_glfw.cpp" "${IMGUI}imgui_impl_vulkan.cpp")
-#target_link_libraries(imgui PRIVATE ${GLFW_LIBS} ${VULKAN_LIBS})
-#target_include_directories(imgui PRIVATE /usr/local/include ${IMGUI})
 
 add_library(tinygltf STATIC "${PROJECT_SRC}inc/tiny_gltf.h" "${PROJECT_SRC}inc/stb_image.h" "${PROJECT_SRC}inc/stb_image_write.h"
                             "${PROJECT_SRC}lib/tiny_gltf_impl.cc")
+
+add_library(spirv STATIC "${PROJECT_SRC}inc/spirv_reflect.h" "${PROJECT_SRC}lib/spirv/spirv_reflect.c")
 
 # Optimization
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${OPTIMIZATION_FLAG}")
@@ -66,7 +63,7 @@ add_subdirectory(game)
 target_include_directories(WaywardVK PRIVATE ${INCLUDE_DIRECTORIES} ${PROJECT_SRC}lib/imgui ${PROJECT_SRC}inc)
 target_include_directories(WaywardGame PRIVATE ${INCLUDE_DIRECTORIES} ${PROJECT_SRC}inc)
 
-set(GAME_LIBRARIES WaywardGame tinygltf)
+set(GAME_LIBRARIES WaywardGame tinygltf spirv)
 target_link_libraries(WaywardVK PRIVATE ${GAME_LIBRARIES}
                                          ${GLFW_LIBS}
                                          ${VULKAN_LIBS}
