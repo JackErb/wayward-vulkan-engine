@@ -3,10 +3,7 @@
 #include "../glm.h"
 #include "../wvk_buffer.h"
 
-/*
-#define VMA_IMPLEMENTATION
-#include <vk_mem_alloc.h>
-*/
+#include "../wvk_vertex_attributes.h"
 
 #include <string>
 #include <vector>
@@ -16,27 +13,19 @@ namespace tinygltf {
     class Model;
     class Node;
     struct Accessor;
+    struct Mesh;
+    struct Skin;
 };
 
 namespace wvk {
 
-#define MAX_JOINTS 4
-
-struct SkeletonVertex {
-    glm::vec3 position;
-    glm::vec3 normal;
-    glm::vec2 texCoord;
-
-    unsigned char joints[MAX_JOINTS];
-    float jointWeights[MAX_JOINTS];
-};
-
 struct SkeletonJoint {
     // translation, rotation, orientation
+    glm::mat4 model;
 };
 
 struct SkeletonData {
-    std::vector<SkeletonVertex> vertices;
+    std::vector<RiggedMeshVertex> vertices;
     std::vector<uint32_t> indices;
     std::vector<SkeletonJoint> joints;
 };
@@ -46,12 +35,15 @@ public:
     Skeleton(std::string filename);
     ~Skeleton();
 
-    const std::vector<SkeletonVertex> &getVertices() { return skeletonData.vertices; }
+    const std::vector<RiggedMeshVertex> &getVertices() { return skeletonData.vertices; }
     const std::vector<uint32_t> &getIndices() { return skeletonData.indices; }
 
 private:
     void createSkeleton(const tinygltf::Model &model);
-    const tinygltf::Node &getNode(const tinygltf::Model &model);
+    std::vector<const tinygltf::Node *> getRiggedMeshes(const tinygltf::Model &model);
+
+    void readMeshData(const tinygltf::Model &model, const tinygltf::Mesh &mesh);
+    void readJointData(const tinygltf::Model &model, const tinygltf::Skin &skin);
 
     SkeletonData skeletonData{};
 

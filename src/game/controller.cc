@@ -34,7 +34,9 @@ DebugController::~DebugController() {
 }
 
 void DebugController::loadModels() {
-    std::vector<wvk::Vertex> vertices = {
+    wvk::WvkDevice &device = app->getDevice();
+
+    std::vector<wvk::MeshVertex> vertices = {
         {{-5.f, -5.f, -1.5f}, {0.f, 0.f, 1.f}, {0.f, 0.f}, 0},
         {{-5.f, 5.f, -1.5f}, {0.f, 0.f, 1.f}, {0.f, 1.f}, 0},
         {{5.f, 5.f, -1.5f}, {0.f, 0.f, 1.f}, {1.f, 1.f}, 0},
@@ -43,13 +45,14 @@ void DebugController::loadModels() {
 
     std::vector<uint32_t> indices = {2, 1, 0, 0, 3, 2};
 
-    wvk::WvkDevice &device = app->getDevice();
-
     wvk::WvkModel *floor = new wvk::WvkModel(device, vertices, indices);
     app->addModel(floor);
 
-    wvk::WvkModel *viking_room = new wvk::WvkModel(device, "viking_room.obj.model");
+    wvk::WvkModel *viking_room = new wvk::WvkModel(device, "viking_room.obj.model", 1);
     app->addModel(viking_room);
+
+    //wvk::WvkSkeleton *skeleton = new wvk::WvkSkeleton(device, "astronaut.glb");
+    //app->addSkeleton(skeleton);
 }
 
 void DebugController::update() {
@@ -75,12 +78,6 @@ void DebugController::updateCamera() {
     if (app->isKeyHeld(GLFW_KEY_D))
         camera.transform.position -= moveSpeed * glm::cross(direction, VECTOR_UP);
 
-
-    #if 1
-    if (app->getFrame() % 600 == 0)
-    logger::debug("yaw: " + std::to_string(camera.transform.yaw) + ", roll: " + std::to_string(camera.transform.roll));
-    #endif
-
     glm::vec2 mousePosition = app->getCursorPos();
     if (app->getFrame() == 0) {
         // Set initial mouse position
@@ -91,12 +88,15 @@ void DebugController::updateCamera() {
         camera.transform.yaw  -= (camera.lastMousePosition.x - mousePosition.x) * lookSpeed;
         camera.transform.roll -= (camera.lastMousePosition.y - mousePosition.y) * lookSpeed;
 
-        // Restrict range of roll from 90 degrees to 270 degrees
-        const float MIN_ROLL = glm::radians(-89.0);
-        const float MAX_ROLL = glm::radians(89.0);
-
-        camera.transform.capRoll();
+        // TODO : if the position difference is too large, ignore it entirely
     }
+
+    // Cap the roll to prevent the camera from tipping over
+    static const float MIN_ROLL = glm::radians(-89.5);
+    static const float MAX_ROLL = glm::radians(89.5);
+
+    if (camera.transform.roll < MIN_ROLL) camera.transform.roll = MIN_ROLL;
+    if (camera.transform.roll > MAX_ROLL) camera.transform.roll = MAX_ROLL;
 
     camera.lastMousePosition = mousePosition;
 }

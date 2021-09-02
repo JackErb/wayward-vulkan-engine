@@ -61,15 +61,27 @@ struct DescriptorLayoutInfo {
     } data[WvkSwapchain::MAX_FRAMES_IN_FLIGHT][MAX_DESCRIPTOR_COUNT];
 };
 
+
+struct VertexDescriptionInfo {
+    VkVertexInputBindingDescription binding;
+    std::vector<VkVertexInputAttributeDescription> attributes;
+};
+
 struct DescriptorSetInfo {
     std::vector<DescriptorLayoutInfo> layoutBindings;
+};
+
+struct PushConstantInfo {
+    std::vector<VkPushConstantRange> pushConstants;
 };
 
 class WvkPipeline {
   public:
     WvkPipeline(WvkDevice& device, WvkSwapchain& swapChain, VkRenderPass renderPass,
                 std::string vertShader, std::string fragShader,
+                const PushConstantInfo &pushInfo,
                 const DescriptorSetInfo &descriptorInfo,
+                const VertexDescriptionInfo &vertexInfo,
                 const PipelineConfigInfo &config);
     ~WvkPipeline();
 
@@ -81,8 +93,10 @@ class WvkPipeline {
     void updateUniformBuffer(int imageIndex, TransformMatrices ubo);
     void bind(VkCommandBuffer commandBuffer, int imageIndex);
 
+    VkPipelineLayout getPipelineLayout() { return pipelineLayout; }
+
   private:
-    void createGraphicsPipeline(std::string vertShader, std::string fragShader, const PipelineConfigInfo &config);
+    void createGraphicsPipeline(std::string vertShader, std::string fragShader, const PipelineConfigInfo &config, const VertexDescriptionInfo &vertexInfo);
 
     void createPipelineLayout();
     void createDescriptorPool();
@@ -94,6 +108,8 @@ class WvkPipeline {
     VkRenderPass renderPass;
 
     PipelineConfigInfo pipelineConfig;
+
+    PushConstantInfo pushConstantInfo;
 
     DescriptorSetInfo descriptorSetInfo;
     VkDescriptorSetLayout descriptorSetLayout;

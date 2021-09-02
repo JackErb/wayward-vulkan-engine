@@ -7,6 +7,7 @@
 #include "wvk_skeleton.h"
 #include "wvk_sampler.h"
 #include "game/game_structs.h"
+#include "glm.h"
 
 #include <vector>
 #include <unordered_map>
@@ -22,6 +23,17 @@ enum KeyState {
 enum CursorState {
     CURSOR_ENABLED,
     CURSOR_DISABLED
+};
+
+struct ObjectPushConstant {
+    uint32_t objectId;
+};
+
+struct ObjectData {
+    static const int MAX_JOINTS = 16;
+
+    glm::mat4 transform;
+    glm::mat4 joints[MAX_JOINTS];
 };
 
 class WvkApplication {
@@ -48,6 +60,7 @@ class WvkApplication {
     void setCamera(Camera *camera) { this->camera = camera; }
     void setLight(int light, TransformMatrices *transform);
     void addModel(WvkModel *model) { models.push_back(model); }
+    void addSkeleton(WvkSkeleton *skeleton) { skeletons.push_back(skeleton); }
 
     uint64_t getFrame() { return frame; }
 
@@ -64,9 +77,12 @@ class WvkApplication {
     void recordShadowRenderPass(int imageIndex);
     void recordMainRenderPass(int imageIndex);
 
-    void writeTransform(TransformMatrices *transform, VkDeviceMemory memory);
+    void writeToBuffer(VkDeviceMemory memory, uint32_t size, const void *data);
 
     void updateKeys();
+
+    std::vector<WvkModel*> models;
+    std::vector<WvkSkeleton*> skeletons;
 
     uint64_t frame = 0;
 
@@ -76,13 +92,13 @@ class WvkApplication {
 
     Camera *camera = nullptr;
 
-    //WvkPipeline pipeline{device, swapChain, swapChain.getRenderPass(), "triangle.vert.spv", "triangle.frag.spv", WvkPipeline::defaultPipelineConfigInfo()};
-    //WvkPipeline shadowPipeline{device, swapChain, swapChain.getShadowRenderPass(), "triangle.vert.spv", "", WvkPipeline::defaultPipelineConfigInfo()};
-    std::unique_ptr<WvkPipeline> pipeline;
     std::unique_ptr<WvkPipeline> shadowPipeline;
+    std::unique_ptr<WvkPipeline> riggedPipeline;
+    std::unique_ptr<WvkPipeline> pipeline;
 
-    std::vector<WvkModel*> models;
-    std::vector<WvkSkeleton*> skeletons;
+    /* TODO: Read this MAX_OBJECTS using spirv-reflect from shader */
+    constexpr static int MAX_OBJECTS = 8;
+    ObjectData objectData[MAX_OBJECTS];
 
     std::vector<VkCommandBuffer> commandBuffers;
 
@@ -95,6 +111,7 @@ class WvkApplication {
 
     std::vector<Buffer> cameraTransformBuffers;
     std::vector<Buffer> lightTransformBuffers;
+    std::vector<Buffer> objectDataBuffers;
 
     std::unordered_map<uint16_t, KeyState> keyStates;
 };

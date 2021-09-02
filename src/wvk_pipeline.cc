@@ -14,14 +14,16 @@ WvkPipeline::WvkPipeline(WvkDevice& device,
                          VkRenderPass renderPass,
                          std::string vertShader,
                          std::string fragShader,
+                         const PushConstantInfo &pushInfo,
                          const DescriptorSetInfo &descriptorInfo,
+                         const VertexDescriptionInfo &vertexInfo,
                          const PipelineConfigInfo& config)
                          : device{device}, swapChain{swapchain}, renderPass{renderPass},
-                           descriptorSetInfo{descriptorInfo} {
+                           descriptorSetInfo{descriptorInfo}, pushConstantInfo{pushInfo} {
     createPipelineLayout();
     logger::debug("Created graphics pipeline layout");
 
-    createGraphicsPipeline(vertShader, fragShader, config);
+    createGraphicsPipeline(vertShader, fragShader, config, vertexInfo);
     logger::debug("Created graphics pipeline");
 
     createDescriptorPool();
@@ -185,12 +187,14 @@ void WvkPipeline::createPipelineLayout() {
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+    pipelineLayoutInfo.pushConstantRangeCount = static_cast<uint32_t>(pushConstantInfo.pushConstants.size());
+    pipelineLayoutInfo.pPushConstantRanges = pushConstantInfo.pushConstants.data();
 
     result = vkCreatePipelineLayout(device.getDevice(), &pipelineLayoutInfo, nullptr, &pipelineLayout);
     checkVulkanError(result, "failed to create pipeline layout.");
 }
 
-void WvkPipeline::createGraphicsPipeline(std::string vertShader, std::string fragShader, const PipelineConfigInfo& config) {
+void WvkPipeline::createGraphicsPipeline(std::string vertShader, std::string fragShader, const PipelineConfigInfo& config, const VertexDescriptionInfo &vertexInfo) {
     vertShaderModule = createShaderModule(vertShader);
 
     VkPipelineShaderStageCreateInfo vertStageInfo{};
@@ -214,15 +218,12 @@ void WvkPipeline::createGraphicsPipeline(std::string vertShader, std::string fra
     }
 
     // Vertex input info
-    auto bindingDescription = Vertex::getBindingDescription();
-    auto attributeDescriptions = Vertex::getAttributeDescriptions();
-
     VkPipelineVertexInputStateCreateInfo inputInfo{};
     inputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     inputInfo.vertexBindingDescriptionCount = 1;
-    inputInfo.pVertexBindingDescriptions = &bindingDescription;
-    inputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
-    inputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+    inputInfo.pVertexBindingDescriptions = &vertexInfo.binding;
+    inputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexInfo.attributes.size());
+    inputInfo.pVertexAttributeDescriptions = vertexInfo.attributes.data();
 
     pipelineConfig = config;
 

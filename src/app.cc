@@ -38,6 +38,10 @@ WvkApplication::~WvkApplication() {
         buffer.cleanup();
     }
 
+    for (auto &buffer : objectDataBuffers) {
+        buffer.cleanup();
+    }
+
     textureSampler.cleanup();
     depthSampler.cleanup();
 
@@ -111,27 +115,51 @@ void WvkApplication::createPipelineResources() {
     }
 
     // Allocate uniform buffers (one per swapchain image)
-    VkDeviceSize bufferSize = sizeof(TransformMatrices);
+    VkDeviceSize transformBufferSize = sizeof(TransformMatrices);
     for (size_t i = 0; i < swapChain.getImageCount(); i++) {
         // TODO: Look into using non-coherent memory and explicitly flush the the device memory
         // to the GPU whenever updated. This can be more efficient, but not all systems will
         // have this memory type available.
 
         cameraTransformBuffers.emplace_back();
-        device.createBuffer(bufferSize,
+        device.createBuffer(transformBufferSize,
                             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                             cameraTransformBuffers[i]);
 
         lightTransformBuffers.emplace_back();
-        device.createBuffer(bufferSize,
+        device.createBuffer(transformBufferSize,
                             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                             lightTransformBuffers[i]);
+
+        objectDataBuffers.emplace_back();
+        device.createBuffer(sizeof(ObjectData) * MAX_OBJECTS,
+                            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                            objectDataBuffers[i]);
+    }
+
+    for (size_t i = 0; i < MAX_OBJECTS; i++) {
+        objectData[i].transform = glm::mat4(1.f);
+        for (size_t j = 0; j < ObjectData::MAX_JOINTS; j++) {
+            objectData[i].joints[j] = glm::mat4(1.f);
+        }
     }
 }
 
 void WvkApplication::createPipelines() {
+    VertexDescriptionInfo meshVertexDescription = {MeshVertex::getBindingDescription(), MeshVertex::getAttributeDescriptions()};
+    VertexDescriptionInfo riggedVertexDescription = {RiggedMeshVertex::getBindingDescription(), RiggedMeshVertex::getAttributeDescriptions()};
+
+    PushConstantInfo emptyPushInfo{};
+    
+    PushConstantInfo objectPushInfo{};
+    objectPushInfo.pushConstants.resize(1);
+    objectPushInfo.pushConstants[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    objectPushInfo.pushConstants[0].offset = 0;
+    objectPushInfo.pushConstants[0].size = sizeof(ObjectPushConstant);
+
     /* Shadow mapping pipeline */
 
     DescriptorSetInfo shadowDescriptor{};
@@ -148,9 +176,12 @@ void WvkApplication::createPipelines() {
         shadowLayout[0].data[i][0].size = lightTransformBuffers[i].size;
     }
 
-    shadowPipeline = std::make_unique<WvkPipeline>(device, swapChain, swapChain.getShadowRenderPass(),
+    shadowPipeline = std::make_unique<WvkPipeline>(device, swapChain,
+                                                   swapChain.getShadowRenderPass(),
                                                    "shadow.vert.spv", "",
+                                                   emptyPushInfo,
                                                    shadowDescriptor,
+                                                   meshVertexDescription,
                                                    WvkPipeline::defaultPipelineConfigInfo(VK_SAMPLE_COUNT_1_BIT));
 
 
@@ -207,10 +238,41 @@ void WvkApplication::createPipelines() {
         mainLayout[4].data[i][0].size = lightTransformBuffers[i].size;
     }
 
-    pipeline = std::make_unique<WvkPipeline>(device, swapChain, swapChain.getRenderPass(),
+    pipeline = std::make_unique<WvkPipeline>(device, swapChain,
+                                             swapChain.getRenderPass(),
                                              "mesh.vert.spv", "basic.frag.spv",
+                                             emptyPushInfo,
                                              mainDescriptor,
+                                             meshVertexDescription,
                                              WvkPipeline::defaultPipelineConfigInfo(VK_SAMPLE_COUNT_4_BIT));
+
+
+    DescriptorSetInfo mainRiggedDescriptor{};
+    auto &mainRiggedLayout = mainRiggedDescriptor.layoutBindings;
+
+    mainRiggedLayout.resize(mainLayout.size() + 1);
+    for (int i = 0; i < mainLayout.size(); i++) {
+        mainRiggedLayout[i] = mainLayout[i];
+    }
+
+    /* Uniform buffer containing object data (i.e. position, joints) */
+    mainRiggedLayout[5].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    mainRiggedLayout[5].count = 1;
+    mainRiggedLayout[5].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    mainRiggedLayout[5].unique = true;
+    for (size_t i = 0; i < swapChain.getImageCount(); i++) {
+        mainRiggedLayout[5].data[i][0].buffer = objectDataBuffers[i].buffer;
+        mainRiggedLayout[5].data[i][0].size = objectDataBuffers[i].size;
+    }
+
+
+    riggedPipeline = std::make_unique<WvkPipeline>(device, swapChain,
+                                                   swapChain.getRenderPass(),
+                                                   "rigged_mesh.vert.spv", "basic.frag.spv",
+                                                   objectPushInfo,
+                                                   mainRiggedDescriptor,
+                                                   riggedVertexDescription,
+                                                   WvkPipeline::defaultPipelineConfigInfo(VK_SAMPLE_COUNT_4_BIT));
 }
 
 void WvkApplication::createCommandBuffers() {
@@ -234,10 +296,10 @@ void WvkApplication::freeCommandBuffers() {
     commandBuffers.clear();
 }
 
-void WvkApplication::writeTransform(TransformMatrices *matrices, VkDeviceMemory memory) {
+void WvkApplication::writeToBuffer(VkDeviceMemory memory, uint32_t size, const void *writeData) {
     void *pData;
-    vkMapMemory(device.getDevice(), memory, 0, sizeof(TransformMatrices), 0, &pData);
-    memcpy(pData, matrices, sizeof(TransformMatrices));
+    vkMapMemory(device.getDevice(), memory, 0, size, 0, &pData);
+    memcpy(pData, writeData, size);
     vkUnmapMemory(device.getDevice(), memory);
 }
 
@@ -280,10 +342,14 @@ void WvkApplication::recordShadowRenderPass(int imageIndex) {
         model->draw(commandBuffer);
     }
 
+    /* TODO:
+    shadowRiggedPipeline->bind(commandBuffer, imageIndex);
+
     for (WvkSkeleton *skeleton : skeletons) {
         skeleton->bind(commandBuffer);
         skeleton->draw(commandBuffer);
     }
+    */
 
     vkCmdEndRenderPass(commandBuffer);
 }
@@ -325,7 +391,7 @@ void WvkApplication::recordMainRenderPass(int imageIndex) {
         float aspectRatio = (float) extent.width / (float) extent.height;
         TransformMatrices matrices = camera->transform.perspectiveProjection(aspectRatio);
 
-        writeTransform(&matrices, cameraTransformBuffers[imageIndex].memory);
+        writeToBuffer(cameraTransformBuffers[imageIndex].memory, sizeof(matrices), &matrices);
     }
 
     pipeline->bind(commandBuffer, imageIndex);
@@ -335,7 +401,16 @@ void WvkApplication::recordMainRenderPass(int imageIndex) {
         model->draw(commandBuffer);
     }
 
+    riggedPipeline->bind(commandBuffer, imageIndex);
+    
+    writeToBuffer(objectDataBuffers[imageIndex].memory, sizeof(objectData), objectData);
+
     for (WvkSkeleton *skeleton : skeletons) {
+        ObjectPushConstant push = {0};
+
+        void *pData = static_cast<void *>(&push);
+        vkCmdPushConstants(commandBuffer, riggedPipeline->getPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ObjectPushConstant), pData);
+
         skeleton->bind(commandBuffer);
         skeleton->draw(commandBuffer);
     }
@@ -414,7 +489,7 @@ void WvkApplication::setLight(int light, TransformMatrices *transform) {
     // TODO: param light index is currently unused
 
     for (size_t i = 0; i < lightTransformBuffers.size(); i++) {
-        writeTransform(transform, lightTransformBuffers[i].memory);
+        writeToBuffer(lightTransformBuffers[i].memory, sizeof(TransformMatrices), transform);
     }
 }
 

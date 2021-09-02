@@ -9,7 +9,7 @@
 
 namespace wvk {
 
-WvkModel::WvkModel(WvkDevice& device, std::string modelFilename) : device{device} {
+WvkModel::WvkModel(WvkDevice& device, std::string modelFilename, int textureId) : device{device} {
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
@@ -25,11 +25,11 @@ WvkModel::WvkModel(WvkDevice& device, std::string modelFilename) : device{device
         logger::debug(warn);
     }
 
-    std::unordered_map<Vertex, uint32_t> indexMap{};
+    std::unordered_map<MeshVertex, uint32_t> indexMap{};
 
     for (const auto& shape : shapes) {
         for (const auto& index : shape.mesh.indices) {
-            Vertex vertex{};
+            MeshVertex vertex{};
 
             vertex.position = {
                 attrib.vertices[3 * index.vertex_index + 0],
@@ -41,6 +41,8 @@ WvkModel::WvkModel(WvkDevice& device, std::string modelFilename) : device{device
                 attrib.texcoords[2 * index.texcoord_index + 0],
                 1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
             };
+
+            vertex.texture_index = textureId;
 
             vertex.normal = {
                 attrib.normals[3 * index.normal_index + 0],
@@ -61,12 +63,12 @@ WvkModel::WvkModel(WvkDevice& device, std::string modelFilename) : device{device
     initialize();
 }
 
-WvkModel::WvkModel(WvkDevice& device, std::vector<Vertex> vertices, std::vector<uint32_t> indices)
+WvkModel::WvkModel(WvkDevice& device, std::vector<MeshVertex> vertices, std::vector<uint32_t> indices)
                    : device{device}, vertices{vertices}, indices{indices} {
     initialize();
 }
 
-void WvkModel::loadModel(std::vector<Vertex> vertices, std::vector<uint32_t> indices) {
+void WvkModel::loadModel(std::vector<MeshVertex> vertices, std::vector<uint32_t> indices) {
     this->vertices = vertices;
     this->indices = indices;
 
@@ -146,48 +148,6 @@ void WvkModel::bind(VkCommandBuffer commandBuffer) {
 
 void WvkModel::draw(VkCommandBuffer commandBuffer) {
     vkCmdDrawIndexed(commandBuffer, indices.size(), 1, 0, 0, 0);
-}
-
-
-
-VkVertexInputBindingDescription Vertex::getBindingDescription() {
-    VkVertexInputBindingDescription bindingDescription{};
-
-    bindingDescription.binding = 0;
-    bindingDescription.stride = sizeof(Vertex);
-    bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-    return bindingDescription;
-}
-
-std::array<VkVertexInputAttributeDescription, 4> Vertex::getAttributeDescriptions() {
-    std::array<VkVertexInputAttributeDescription, 4> attributeDescriptions{};
-
-    /* Vertex position */
-    attributeDescriptions[0].location = 0;
-    attributeDescriptions[0].binding = 0;
-    attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions[0].offset = offsetof(Vertex, position);
-
-    /* Vertex normal */
-    attributeDescriptions[1].location = 1;
-    attributeDescriptions[1].binding = 0;
-    attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions[1].offset = offsetof(Vertex, normal);
-
-    /* Texture coordinate */
-    attributeDescriptions[2].location = 2;
-    attributeDescriptions[2].binding = 0;
-    attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-    attributeDescriptions[2].offset = offsetof(Vertex, tex_coord);
-
-    /* Texture id */
-    attributeDescriptions[3].location = 3;
-    attributeDescriptions[3].binding = 0;
-    attributeDescriptions[3].format = VK_FORMAT_R8_UINT;
-    attributeDescriptions[3].offset = offsetof(Vertex, texture_index);
-
-    return attributeDescriptions;
 }
 
 }

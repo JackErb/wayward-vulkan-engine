@@ -13,9 +13,6 @@ struct TransformMatrices {
 };
 
 struct Transform {
-    static constexpr float MIN_ROLL = glm::radians(-89.5);
-    static constexpr float MAX_ROLL = glm::radians(89.5);
-
     glm::vec3 position; // position in worldspace
     float yaw;
     float roll;
@@ -55,17 +52,11 @@ struct Transform {
         return a.y >= 0 ? theta : -theta;
     }
 
-    void capRoll() {
-        if (roll < MIN_ROLL) roll = MIN_ROLL;
-        if (roll > MAX_ROLL) roll = MAX_ROLL;
-    }
-
     void setDirection(glm::vec3 direction) {
         float directionDist = sqrt(direction.x * direction.x + direction.y * direction.y);
 
         yaw = getAngle(glm::vec2(direction.x, direction.y), glm::vec2(1, 0));
         roll = getAngle(glm::vec2(directionDist, -direction.z), glm::vec2(1, 0));
-        capRoll();
     }
 
     void lookingTowards(glm::vec3 point) {

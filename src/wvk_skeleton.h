@@ -19,7 +19,7 @@ namespace wvk {
 class WvkSkeleton {
 public:
     WvkSkeleton(WvkDevice& device, std::string modelFilename);
-    ~WvkSkeleton() {}
+    ~WvkSkeleton();
 
     WvkSkeleton(const WvkSkeleton &) = delete;
     WvkSkeleton &operator=(const WvkSkeleton &) = delete;
@@ -28,9 +28,16 @@ public:
     void draw(VkCommandBuffer commandBuffer);
 
 private:
+    void createIndexBuffer();
+    void createVertexBuffer();
+
     WvkDevice& device;
 
-    WvkModel model;
+    Buffer vertexBuffer;
+    Buffer vertexStagingBuffer;
+
+    Buffer indexBuffer;
+    Buffer indexStagingBuffer;
 
     wvk::Skeleton skeleton;
 };

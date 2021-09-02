@@ -7,8 +7,17 @@
 
 namespace wvk {
 
-std::vector<char> readFile(const std::string &filename);
 
-VkShaderModule createShaderModule(filename);
+struct ShaderUniform {
+    enum UniformType {
+        Buffer, Image, Sampler
+    };
+};
+
+class Shader {
+public:
+    Shader(std::string str);
+    ~Shader();
+};
 
 };
